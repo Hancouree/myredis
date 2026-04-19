@@ -17,6 +17,7 @@
 *.suo
 *.userosscache
 *.sln.docstates
+myredis/
 
 *.db
 *.log
