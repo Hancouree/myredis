@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <optional>
 #include <chrono>
+#include <random>
 
 struct Record {
 	std::string value;
@@ -11,6 +12,7 @@ struct Record {
 class Repository
 {
 public:
+	void performCleanup();
 	void set(const std::string& key, const std::string& value);
 	bool expires(const std::string& key, int seconds);
 	std::string get(const std::string& key);
@@ -18,6 +20,7 @@ public:
 	size_t getMemoryUsed();
 	size_t count() const;
 private:
+	std::mt19937 m_gen{ std::random_device{}() };
 	std::unordered_map<std::string, Record> m_data;
 	bool m_isCacheDirty = true;
 	size_t m_cachedMemoryUsed = 0;

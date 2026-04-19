@@ -1,5 +1,25 @@
 #include "../include/Repository.h"
 
+void Repository::performCleanup()
+{
+	int samples = 20;
+	auto now = std::chrono::steady_clock::now();
+
+	for (int i = 0; i < samples; ++i) {
+		std::uniform_int_distribution<size_t> dist(0, m_data.size() - 1);
+
+		auto it = m_data.begin();
+		std::advance(it, dist(m_gen));
+
+		if (it->second.expires_at.has_value() && now >= it->second.expires_at) {
+			m_data.erase(it);
+			m_isCacheDirty = true;
+		}
+
+		if (m_data.empty()) break;
+	}
+}
+
 void Repository::set(const std::string& key, const std::string& value)
 {
 	m_data[key] = { value, std::nullopt };
