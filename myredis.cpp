@@ -3,6 +3,7 @@
 #include <queue>
 #include <optional>
 #include <boost/asio.hpp>
+#include <windows.h>
 
 namespace asio = boost::asio;
 using tcp = boost::asio::ip::tcp;
@@ -58,6 +59,7 @@ class Repository {
 public:
     void set(const std::string& key, const std::string& value) {
         m_data[key] = { value, std::nullopt };
+        m_isCacheDirty = true;
     }
 
     bool expires(const std::string& key, int seconds) {
@@ -86,47 +88,110 @@ public:
     }
 
     bool del(const std::string& key) {
+        m_isCacheDirty = true;
         return m_data.erase(key) > 0;
+    }
+
+    size_t getMemoryUsed() {
+        if (m_isCacheDirty) {
+            m_cachedMemoryUsed = 0;
+            for (const auto& [key, record] : m_data) {
+                m_cachedMemoryUsed += key.size() + record.value.size();
+                m_cachedMemoryUsed += sizeof(std::pair<const std::string, Record>) + 24;
+            }
+
+            m_isCacheDirty = false;
+        }
+
+        return m_cachedMemoryUsed;
+    }
+
+    size_t count() const {
+        return m_data.size();
     }
 private:
     std::unordered_map<std::string, Record> m_data;
+    bool m_isCacheDirty = true;
+    size_t m_cachedMemoryUsed = 0;
+};
+
+class ServerContext {
+public:
+    std::shared_ptr<Repository> m_repo;
+
+    ServerContext()
+        : m_activeConnections(0)
+        , m_allConnections(0)
+        , m_processedCommands(0)
+        , m_repo(std::make_shared<Repository>())
+        , m_startTime(std::chrono::steady_clock::now())
+    {}
+
+    void incrementConnections() { ++m_activeConnections; ++m_allConnections; }
+    void decrementConnections() { --m_activeConnections; }
+    void incrementProcessedCommands() { ++m_processedCommands; }
+    int getConnections() const { return m_activeConnections; }
+    int getAllConnections() const { return m_allConnections; }
+    int getAllProcessedCommands() const { return m_processedCommands; }
+    auto getStartTime() const { return m_startTime; }
+private:
+    std::atomic<int> m_activeConnections;
+    std::atomic<int> m_allConnections;
+    std::atomic<int> m_processedCommands;
+    std::chrono::steady_clock::time_point m_startTime;
 };
 
 class Handler {
 public:
     virtual ~Handler() = default;
-    virtual void execute(const std::vector<std::string>& args, std::shared_ptr<Repository>& m_repo, std::function<void(const std::string&)> callback) = 0;
+    virtual void execute(
+        const std::vector<std::string>& args, 
+        std::shared_ptr<ServerContext>& serverCtx, 
+        std::function<void(const std::string&)> callback
+    ) = 0;
 };
 
 class PingHandler : public Handler {
 public:
-    void execute(const std::vector<std::string>& args, std::shared_ptr<Repository>& m_repo, std::function<void(const std::string&)> callback) override {
+    void execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx,
+        std::function<void(const std::string&)> callback
+    ) override {
         callback("PONG\r\n");
     }
 };
 
 class SetHandler : public Handler {
 public:
-    void execute(const std::vector<std::string>& args, std::shared_ptr<Repository>& m_repo, std::function<void(const std::string&)> callback) override {
+    void execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx,
+        std::function<void(const std::string&)> callback
+    ) override {
         if (args.size() < 3) {
             callback("-ERR wrong number of arguments for SET\r\n");
             return;
         }
 
-        m_repo->set(args[1], args[2]);
+        serverCtx->m_repo->set(args[1], args[2]);
         callback("+OK\r\n");
     }
 };
 
 class GetHandler : public Handler {
 public:
-    void execute(const std::vector<std::string>& args, std::shared_ptr<Repository>& m_repo, std::function<void(const std::string&)> callback) override {
+    void execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx,
+        std::function<void(const std::string&)> callback
+    ) override {
         if (args.size() < 2) {
             callback("-ERR wrong number of arguments for GET\r\n");
             return;
         }
 
-        std::string val = m_repo->get(args[1]);
+        std::string val = serverCtx->m_repo->get(args[1]);
         if (val.empty()) {
             callback("$-1\r\n");
         }
@@ -138,7 +203,11 @@ public:
 
 class ExpireHandler : public Handler {
 public:
-    void execute(const std::vector<std::string>& args, std::shared_ptr<Repository>& m_repo, std::function<void(const std::string&)> callback) override {
+    void execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx,
+        std::function<void(const std::string&)> callback
+    ) override {
         if (args.size() < 3) {
             callback("-ERR wrong number of arguments for EXPIRE\r\n");
             return;
@@ -148,7 +217,7 @@ public:
         {
             int seconds = std::stoi(args[2]);
 
-            if (m_repo->expires(args[1], seconds)) {
+            if (serverCtx->m_repo->expires(args[1], seconds)) {
                 callback(":1\r\n");
             }
             else {
@@ -164,18 +233,47 @@ public:
 
 class DelHandler : public Handler {
 public:
-    void execute(const std::vector<std::string>& args, std::shared_ptr<Repository>& m_repo, std::function<void(const std::string&)> callback) override {
+    void execute(
+        const std::vector<std::string>& args, 
+        std::shared_ptr<ServerContext>& serverCtx, 
+        std::function<void(const std::string&)> callback
+    ) override {
         if (args.size() < 2) {
             callback("-ERR wrong number of arguments for DEL\r\n");
             return;
         }
 
-        if (m_repo->del(args[1])) {
+        if (serverCtx->m_repo->del(args[1])) {
             callback(":1\r\n");
         }
         else {
             callback(":0\r\n");
         }
+    }
+};
+
+class InfoHandler : public Handler {
+public:
+    void execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx,
+        std::function<void(const std::string&)> callback
+    ) override {
+        auto now = std::chrono::steady_clock::now();
+
+        std::stringstream ss;
+        ss << "Server\r\n";
+        ss << "server_version:1.0.0\r\n";
+        ss << "uptime_in_seconds:" << std::chrono::duration_cast<std::chrono::seconds>(now - serverCtx->getStartTime()).count() << "\r\n";
+        ss << "connected_clients:" << serverCtx->getConnections() << "\r\n";
+        ss << "process_id:" << GetCurrentProcessId() << "\r\n\r\n";
+        ss << "used_memory:" << serverCtx->m_repo->getMemoryUsed() << "\r\n";
+        ss << "keys_count:" << serverCtx->m_repo->count() << "\r\n\r\n";
+        ss << "total_connections_received:" << serverCtx->getAllConnections() << "\r\n";
+        ss << "total_commands_processed:" << serverCtx->getAllProcessedCommands() << "\r\n";
+
+        std::string result = ss.str();
+        callback("$" + std::to_string(result.size()) + "\r\n" + result + "\r\n");
     }
 };
 
@@ -189,28 +287,33 @@ public:
         m_handlers["GET"] = std::make_shared<GetHandler>();
         m_handlers["EXPIRE"] = std::make_shared<ExpireHandler>();
         m_handlers["DEL"] = std::make_shared<DelHandler>();
+        m_handlers["INFO"] = std::make_shared<InfoHandler>();
     }
 
     static void handle(
         const std::string& cmd, 
         const std::vector<std::string>& args,
-        std::shared_ptr<Repository>& m_repo,
+        std::shared_ptr<ServerContext>& serverCtx,
         std::function<void(const std::string&)> callback
     ) {
         if (auto it = m_handlers.find(cmd); it != m_handlers.end()) {
-            it->second->execute(args, m_repo, callback);
+            it->second->execute(args, serverCtx, callback);
         }
     }
 private:
-    static std::unordered_map<std::string, std::shared_ptr<Handler>> m_handlers;
+    inline static std::unordered_map<std::string, std::shared_ptr<Handler>> m_handlers;
 };
 
 class Session : public std::enable_shared_from_this<Session> {
 public:
-    Session(tcp::socket s, std::shared_ptr<Repository> repo) 
+    Session(tcp::socket s, std::shared_ptr<ServerContext> serverCtx) 
         : m_socket(std::move(s))
-        , m_repo(repo) 
-    {}
+        , m_serverCtx(serverCtx) 
+    {
+        m_serverCtx->incrementConnections();
+    }
+
+    ~Session() { m_serverCtx->decrementConnections(); }
 
     void run() { doRead(); }
 private:
@@ -260,25 +363,28 @@ private:
         if (args.empty()) return;
 
         Registry::handle(
-            args[1], 
+            args[0], 
             args,
-            m_repo,
-            [this](const std::string& answer) { doWrite(answer); }
+            m_serverCtx,
+            [this](const std::string& answer) { 
+                m_serverCtx->incrementProcessedCommands();
+                doWrite(answer); 
+            }
         );
     }
 
     tcp::socket m_socket;
     asio::streambuf m_buffer;
     Parser m_parser;
-    std::shared_ptr<Repository> m_repo;
+    std::shared_ptr<ServerContext> m_serverCtx;
     std::queue<std::string> m_writingQueue;
 };
 
 class Listener : public std::enable_shared_from_this<Listener> {
 public:
-    Listener(asio::io_context& ctx) 
+    Listener(asio::io_context& ctx, std::shared_ptr<ServerContext> serverCtx)
         : m_acceptor(ctx, { boost::asio::ip::make_address("127.0.0.1"), 5050 }) 
-        , m_repo(std::make_shared<Repository>())
+        , m_serverCtx(serverCtx)
     {}
 
     void run() { doAccept(); }
@@ -287,7 +393,7 @@ private:
         m_acceptor.async_accept(
             [self = shared_from_this()](boost::system::error_code ec, tcp::socket s) {
                 if (!ec) {
-                    std::make_shared<Session>(std::move(s), self->m_repo)->run();
+                    std::make_shared<Session>(std::move(s), self->m_serverCtx)->run();
                 } 
 
                 self->doAccept();
@@ -295,16 +401,17 @@ private:
     }
 
     tcp::acceptor m_acceptor;
-    std::shared_ptr<Repository> m_repo;
+    std::shared_ptr<ServerContext> m_serverCtx;
 };
 
 int main()
 {
+    auto serverCtx = std::make_shared<ServerContext>();
     Registry::init();
 
     asio::io_context ctx;
 
-    std::make_shared<Listener>(ctx)->run(); //Started listener
+    std::make_shared<Listener>(ctx, serverCtx)->run(); //Started listener
 
     ctx.run();
 }
