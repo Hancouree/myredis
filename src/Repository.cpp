@@ -2,21 +2,12 @@
 
 void Repository::performCleanup()
 {
-	int samples = 20;
 	auto now = std::chrono::steady_clock::now();
 
-	for (int i = 0; i < samples; ++i) {
-		std::uniform_int_distribution<size_t> dist(0, m_data.size() - 1);
-
-		auto it = m_data.begin();
-		std::advance(it, dist(m_gen));
-
-		if (it->second.expires_at.has_value() && now >= it->second.expires_at) {
-			m_data.erase(it);
-			m_isCacheDirty = true;
-		}
-
-		if (m_data.empty()) break;
+	while (!m_expirationIndexes.empty() && now >= m_expirationIndexes.begin()->first) {
+		m_data.erase(m_expirationIndexes.begin()->second);
+		m_expirationIndexes.erase(m_expirationIndexes.begin());
+		m_isCacheDirty = true;
 	}
 }
 
@@ -29,7 +20,9 @@ void Repository::set(const std::string& key, const std::string& value)
 bool Repository::expires(const std::string& key, int seconds)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
-		it->second.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+		auto expires_at = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+		it->second.expires_at = expires_at;
+		m_expirationIndexes.insert({ expires_at, key });
 		return true;
 	}
 
