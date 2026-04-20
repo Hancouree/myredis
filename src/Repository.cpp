@@ -2,26 +2,29 @@
 
 void Repository::performCleanup()
 {
-	int samples = 20;
 	auto now = std::chrono::steady_clock::now();
-
-	for (int i = 0; i < samples; ++i) {
-		std::uniform_int_distribution<size_t> dist(0, m_data.size() - 1);
-
-		auto it = m_data.begin();
-		std::advance(it, dist(m_gen));
-
-		if (it->second.expires_at.has_value() && now >= it->second.expires_at) {
-			m_data.erase(it);
-			m_isCacheDirty = true;
-		}
-
-		if (m_data.empty()) break;
+	while (!m_expiringKeys.empty() && now >= m_expiringKeys.begin()->first) {
+		m_data.erase(m_expiringKeys.begin()->second);
+		m_expiringKeys.erase(m_expiringKeys.begin());
+		m_isCacheDirty = true;
 	}
 }
 
 void Repository::set(const std::string& key, const std::string& value)
 {
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (it->second.expires_at.has_value()) {
+			auto [range_start, range_end] = m_expiringKeys.equal_range(it->second.expires_at.value());
+			
+			for (auto it = range_start; it != range_end; ++it) {
+				if (it->second == key) {
+					m_expiringKeys.erase(it);
+					break;
+				}
+			}
+		}
+	}
+
 	m_data[key] = { value, std::nullopt };
 	m_isCacheDirty = true;
 }
@@ -29,7 +32,9 @@ void Repository::set(const std::string& key, const std::string& value)
 bool Repository::expires(const std::string& key, int seconds)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
-		it->second.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+		auto expires_at = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+		it->second.expires_at = expires_at;
+		m_expiringKeys.insert({ expires_at, key });
 		return true;
 	}
 
@@ -40,9 +45,18 @@ std::string Repository::get(const std::string& key)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
 		auto now = std::chrono::steady_clock::now();
+		
 		if (it->second.expires_at.has_value()) {
 			if (now >= it->second.expires_at) {
 				m_data.erase(it);
+				auto [range_start, range_end] = m_expiringKeys.equal_range(it->second.expires_at.value());
+				for (auto it = range_start; it != range_end; ++it) {
+					if (it->second == key) {
+						m_expiringKeys.erase(it);
+						break;
+					}
+				}
+
 				return "";
 			}
 		}
@@ -55,8 +69,24 @@ std::string Repository::get(const std::string& key)
 
 bool Repository::del(const std::string& key)
 {
-	m_isCacheDirty = true;
-	return m_data.erase(key) > 0;
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (it->second.expires_at.has_value()) {
+			auto [range_start, range_end] = m_expiringKeys.equal_range(it->second.expires_at.value());
+			
+			for (auto it = range_start; it != range_end; ++it) {
+				if (it->second == key) {
+					m_expiringKeys.erase(it);
+					break;
+				}
+			}
+		}
+
+		m_data.erase(it);
+		m_isCacheDirty = true;
+		return true;
+	}
+
+	return false;
 }
 
 size_t Repository::getMemoryUsed()
@@ -78,6 +108,3 @@ size_t Repository::count() const
 {
 	return m_data.size();
 }
-
-
-
