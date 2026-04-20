@@ -9,7 +9,7 @@ public:
 
     static void init();
 
-    static std::optional<std::string> handle(
+    static std::string handle(
         const std::string& cmd,
         const std::vector<std::string>& args,
         std::shared_ptr<ServerContext>& serverCtx

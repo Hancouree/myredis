@@ -25,9 +25,9 @@ void Session::doRead()
                 std::vector<std::string> results;
                 std::vector<std::string> args;
                 while (self->m_parser.parse(self->m_buffer, args)) {
-                    std::optional<std::string> res = self->handleCommand(args);
-                    if (res.has_value()) {
-                        results.push_back(res.value());
+                    std::string res = self->handleCommand(args);
+                    if (!res.empty()) {
+                        results.push_back(res);
                         self->m_serverCtx->incrementProcessedCommands();
                     }
 
@@ -73,9 +73,9 @@ void Session::doWriteNext()
         });
 }
 
-std::optional<std::string> Session::handleCommand(std::vector<std::string>& args)
+std::string Session::handleCommand(std::vector<std::string>& args)
 {
-    if (args.empty()) return std::nullopt;
+    if (args.empty()) return "";
     return Registry::handle(
         args[0],
         args,

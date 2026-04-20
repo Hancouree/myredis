@@ -21,7 +21,7 @@ void Registry::init()
     m_handlers["HLEN"] = std::make_shared<HLenHandler>();
 }
 
-std::optional<std::string> Registry::handle(
+std::string Registry::handle(
     const std::string& cmd, 
     const std::vector<std::string>& args, 
     std::shared_ptr<ServerContext>& serverCtx
@@ -30,5 +30,5 @@ std::optional<std::string> Registry::handle(
         return it->second->execute(args, serverCtx);
     }
 
-    return std::nullopt;
+    return "-ERR unknown command\r\n";;
 }

@@ -5,7 +5,7 @@
 
 std::string PingHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
-    return "PONG\r\n";
+    return "+PONG\r\n";
 }
 
 std::string SetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
