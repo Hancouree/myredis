@@ -76,8 +76,12 @@ void Session::doWriteNext()
 std::string Session::handleCommand(std::vector<std::string>& args)
 {
     if (args.empty()) return "";
+
+    std::string cmd = args[0];
+    std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
+
     return Registry::handle(
-        args[0],
+        cmd,
         args,
         m_serverCtx
     );
