@@ -24,19 +24,28 @@ std::string GetHandler::execute(const std::vector<std::string>& args, std::share
         return "-ERR wrong number of arguments for GET\r\n";
     }
 
-    auto val = serverCtx->m_repo->get(args[1]);
-    if (!val.has_value()) return "$-1\r\n";
+    const RecordValue* val = serverCtx->m_repo->get(args[1]);
+    if (!val) return "$-1\r\n";
 
-    if (auto* str = std::get_if<std::string>(&val.value())) {
-        return "$" + std::to_string(str->size()) + "\r\n" + *str + "\r\n";
+    if (auto* s = std::get_if<String>(val)) {
+        return "$" + std::to_string(s->size()) + "\r\n" + *s + "\r\n";
     }
-    else if (auto* deq = std::get_if<std::deque<std::string>>(&val.value())) {
+    else if (auto* l = std::get_if<List>(val)) {
         std::stringstream ss;
-        ss << "*" << deq->size() << "\r\n";
-        for (const auto& e : *deq) {
+        ss << "*" << l->size() << "\r\n";
+        for (const auto& e : *l) {
             ss << "$" << e.size() << "\r\n" << e << "\r\n";
         }
 
+        return ss.str();
+    }
+    else if (auto* h = std::get_if<Hash>(val)) {
+        std::stringstream ss;
+        ss << "*" << h->size() * 2 << "\r\n";
+        for (auto it = h->begin(); it != h->end(); ++it) {
+            ss << "$" << it->first.size() << "\r\n" << it->first << "\r\n";
+            ss << "$" << it->second.size() << "\r\n" << it->second << "\r\n";
+        }
         return ss.str();
     }
 
@@ -102,7 +111,7 @@ std::string InfoHandler::execute(const std::vector<std::string>& args, std::shar
 std::string LPushHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return "-ERR wrong number of arguments for DEL\r\n";
+        return "-ERR wrong number of arguments for LPUSH\r\n";
     }
 
     try
@@ -119,13 +128,125 @@ std::string LPushHandler::execute(const std::vector<std::string>& args, std::sha
 std::string RPushHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return "-ERR wrong number of arguments for DEL\r\n";
+        return "-ERR wrong number of arguments for RPUSH\r\n";
     }
 
     try
     {
         int size = serverCtx->m_repo->rpush(args[1], args[2]);
         return ":" + std::to_string(size) + "\r\n";
+    }
+    catch (const std::runtime_error& e)
+    {
+        return std::string("-ERR ") + e.what() + "\r\n";
+    }
+}
+
+std::string HSetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 4) {
+        return "-ERR wrong number of arguments for HSET\r\n";
+    }
+
+    try
+    {
+        int r = serverCtx->m_repo->hset(args[1], args[2], args[3]);
+        return ":" + std::to_string(r) + "\r\n";
+    }
+    catch (const std::runtime_error& e)
+    {
+        return std::string("-ERR ") + e.what() + "\r\n";
+    }
+}
+
+std::string HGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return "-ERR wrong number of arguments for HGET\r\n";
+    }
+
+    try
+    {
+        std::optional<String> val = serverCtx->m_repo->hget(args[1], args[2]);
+        if (!val.has_value()) {
+            return "$-1\r\n";
+        }
+
+        return "$" + std::to_string(val->size()) + "\r\n" + val.value() + "\r\n";
+    }
+    catch (const std::runtime_error& e)
+    {
+        return std::string("-ERR ") + e.what() + "\r\n";
+    }
+}
+
+std::string HGetAllHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return "-ERR wrong number of arguments for HGETALL\r\n";
+    }
+
+    try
+    {
+        const Hash* h = serverCtx->m_repo->hgetall(args[1]);
+        if (!h) return "*0\r\n";
+
+        std::stringstream ss;
+        ss << "*" << h->size() * 2 << "\r\n";
+        for (auto it = h->begin(); it != h->end(); ++it) {
+            ss << "$" << it->first.size() << "\r\n" << it->first << "\r\n";
+            ss << "$" << it->second.size() << "\r\n" << it->second << "\r\n";
+        }
+        return ss.str();
+    }
+    catch (const std::runtime_error& e)
+    {
+        return std::string("-ERR ") + e.what() + "\r\n";
+    }
+}
+
+std::string HDelHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return "-ERR wrong number of arguments for HDEL\r\n";
+    }
+
+    try
+    {
+        bool deleted = serverCtx->m_repo->hdel(args[1], args[2]);
+        return deleted ? ":1\r\n" : ":0\r\n";
+    }
+    catch (const std::runtime_error& e)
+    {
+        return std::string("-ERR ") + e.what() + "\r\n";
+    }
+}
+
+std::string HExistsHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return "-ERR wrong number of arguments for HEXISTS\r\n";
+    }
+
+    try
+    {
+        return serverCtx->m_repo->hexists(args[1], args[2]) ? ":1\r\n" : ":0\r\n";
+    }
+    catch (const std::runtime_error& e)
+    {
+        return std::string("-ERR ") + e.what() + "\r\n";
+    }
+}
+
+std::string HLenHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return "-ERR wrong number of arguments for HLEN\r\n";
+    }
+
+    try
+    {
+        return ":" + std::to_string(serverCtx->m_repo->hlen(args[1])) + "\r\n";
     }
     catch (const std::runtime_error& e)
     {

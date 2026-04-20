@@ -14,11 +14,11 @@ void Repository::set(const std::string& key, const std::string& value)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
 		if (it->second.expires_at.has_value()) {
-			auto [range_start, range_end] = m_expiringKeys.equal_range(it->second.expires_at.value());
+			auto range = m_expiringKeys.equal_range(it->second.expires_at.value());
 			
-			for (auto it = range_start; it != range_end; ++it) {
-				if (it->second == key) {
-					m_expiringKeys.erase(it);
+			for (auto e_it = range.first; e_it != range.second; ++e_it) {
+				if (e_it->second == key) {
+					m_expiringKeys.erase(e_it);
 					break;
 				}
 			}
@@ -32,17 +32,17 @@ void Repository::set(const std::string& key, const std::string& value)
 int Repository::lpush(const std::string& key, const std::string& value)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<std::deque<std::string>>(it->second.value)) {
+		if (!std::holds_alternative<List>(it->second.value)) {
 			throw std::runtime_error("WRONGTYPE");
 		}
 
-		auto& deq = std::get<std::deque<std::string>>(it->second.value);
-		deq.push_front(value);
+		auto& l = std::get<List>(it->second.value);
+		l.push_front(value);
 		m_isCacheDirty = true;
-		return deq.size();
+		return l.size();
 	}
 	else {
-		m_data[key] = { std::deque<std::string>{value}, std::nullopt };
+		m_data[key] = { List{value}, std::nullopt };
 		m_isCacheDirty = true;
 		return 1;
 	}
@@ -51,20 +51,117 @@ int Repository::lpush(const std::string& key, const std::string& value)
 int Repository::rpush(const std::string& key, const std::string& value)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<std::deque<std::string>>(it->second.value)) {
+		if (!std::holds_alternative<List>(it->second.value)) {
 			throw std::runtime_error("WRONGTYPE");
 		}
 
-		auto& deq = std::get<std::deque<std::string>>(it->second.value);
-		deq.push_back(value);
+		auto& l = std::get<List>(it->second.value);
+		l.push_back(value);
 		m_isCacheDirty = true;
-		return deq.size();
+		return l.size();
 	}
 	else {
-		m_data[key] = { std::deque<std::string>{value}, std::nullopt };
+		m_data[key] = { List{value}, std::nullopt };
 		m_isCacheDirty = true;
 		return 1;
 	}
+}
+
+int Repository::hset(const std::string& key, const std::string& field, const std::string& value)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<Hash>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		auto& h = std::get<Hash>(it->second.value);
+		auto [it_h, inserted] = h.insert_or_assign(field, value);
+		m_isCacheDirty = true;
+		return inserted ? 1 : 0;
+	}
+	else {
+		m_data[key] = { Hash{ { field, value} }, std::nullopt };
+		m_isCacheDirty = true;
+		return 1;
+	}
+}
+
+std::optional<String> Repository::hget(const std::string& key, const std::string& field)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<Hash>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		auto& h = std::get<Hash>(it->second.value);
+		if (auto it_h = h.find(field); it_h != h.end()) {
+			return it_h->second;
+		}
+
+		return std::nullopt;
+	}
+
+	return std::nullopt;
+}
+
+const Hash* Repository::hgetall(const std::string& key)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<Hash>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		auto& h = std::get<Hash>(it->second.value);
+		return &h;
+	}
+
+	return nullptr;
+}
+
+bool Repository::hdel(const std::string& key, const std::string& field)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<Hash>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		auto& h = std::get<Hash>(it->second.value);
+		bool erased = h.erase(field) > 0;
+		if (erased) { 
+			m_isCacheDirty = true; 
+			if (h.empty()) m_data.erase(it);
+		}
+		return erased;
+	}
+
+	return false;
+}
+
+bool Repository::hexists(const std::string& key, const std::string& field)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<Hash>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		auto& h = std::get<Hash>(it->second.value);
+		return h.contains(field);
+	}
+
+	return false;
+}
+
+int Repository::hlen(const std::string& key)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<Hash>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		return std::get<Hash>(it->second.value).size();
+	}
+
+	return 0;
 }
 
 bool Repository::expires(const std::string& key, int seconds)
@@ -79,41 +176,39 @@ bool Repository::expires(const std::string& key, int seconds)
 	return false;
 }
 
-std::optional<std::variant<std::string, std::deque<std::string>>> Repository::get(const std::string& key)
+const RecordValue* Repository::get(const std::string& key)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
 		auto now = std::chrono::steady_clock::now();
-		
+
 		if (it->second.expires_at.has_value()) {
 			if (now >= it->second.expires_at) {
-				m_data.erase(it);
-				auto [range_start, range_end] = m_expiringKeys.equal_range(it->second.expires_at.value());
-				for (auto it = range_start; it != range_end; ++it) {
-					if (it->second == key) {
-						m_expiringKeys.erase(it);
+				auto range = m_expiringKeys.equal_range(it->second.expires_at.value());
+				for (auto e_it = range.first; e_it != range.second; ++e_it) {
+					if (e_it->second == key) {
+						m_expiringKeys.erase(e_it);
 						break;
 					}
 				}
 
-				return std::nullopt;
+				m_data.erase(it);
+				return nullptr;
 			}
 		}
-
-		return it->second.value;
+		return &it->second.value;
 	}
-
-	return std::nullopt;
+	return nullptr;
 }
 
 bool Repository::del(const std::string& key)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
 		if (it->second.expires_at.has_value()) {
-			auto [range_start, range_end] = m_expiringKeys.equal_range(it->second.expires_at.value());
+			auto range = m_expiringKeys.equal_range(it->second.expires_at.value());
 			
-			for (auto it = range_start; it != range_end; ++it) {
-				if (it->second == key) {
-					m_expiringKeys.erase(it);
+			for (auto e_it = range.first; e_it != range.second; ++e_it) {
+				if (e_it->second == key) {
+					m_expiringKeys.erase(e_it);
 					break;
 				}
 			}
@@ -134,13 +229,19 @@ size_t Repository::getMemoryUsed()
 		for (const auto& [key, record] : m_data) {
 			m_cachedMemoryUsed += key.size() + sizeof(std::pair<const std::string, Record>) + 24;
 
-			if (auto* str = std::get_if<std::string>(&record.value)) {
-				m_cachedMemoryUsed += str->size();
+			if (auto* s = std::get_if<String>(&record.value)) {
+				m_cachedMemoryUsed += s->size();
 			}
-			else if (auto* deq = std::get_if<std::deque<std::string>>(&record.value)) {
-				m_cachedMemoryUsed += sizeof(std::deque<std::string>);
-				for (const auto& item : *deq) {
+			else if (auto* l = std::get_if<List>(&record.value)) {
+				m_cachedMemoryUsed += sizeof(List);
+				for (const auto& item : *l) {
 					m_cachedMemoryUsed += item.size();
+				}
+			}
+			else if (auto* h = std::get_if<Hash>(&record.value)) {
+				m_cachedMemoryUsed += sizeof(Hash);
+				for (const auto& [field, value] : *h) {
+					m_cachedMemoryUsed += field.size() + value.size() + 24;
 				}
 			}
 		}

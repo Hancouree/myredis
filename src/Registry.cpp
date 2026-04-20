@@ -13,6 +13,12 @@ void Registry::init()
     m_handlers["INFO"] = std::make_shared<InfoHandler>();
     m_handlers["LPUSH"] = std::make_shared<LPushHandler>();
     m_handlers["RPUSH"] = std::make_shared<RPushHandler>();
+    m_handlers["HSET"] = std::make_shared<HSetHandler>();
+    m_handlers["HGET"] = std::make_shared<HGetHandler>();
+    m_handlers["HGETALL"] = std::make_shared<HGetAllHandler>();
+    m_handlers["HDEL"] = std::make_shared<HDelHandler>();
+    m_handlers["HEXISTS"] = std::make_shared<HExistsHandler>();
+    m_handlers["HLEN"] = std::make_shared<HLenHandler>();
 }
 
 std::optional<std::string> Registry::handle(
