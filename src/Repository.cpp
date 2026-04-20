@@ -29,6 +29,44 @@ void Repository::set(const std::string& key, const std::string& value)
 	m_isCacheDirty = true;
 }
 
+int Repository::lpush(const std::string& key, const std::string& value)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<std::deque<std::string>>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		auto& deq = std::get<std::deque<std::string>>(it->second.value);
+		deq.push_front(value);
+		m_isCacheDirty = true;
+		return deq.size();
+	}
+	else {
+		m_data[key] = { std::deque<std::string>{value}, std::nullopt };
+		m_isCacheDirty = true;
+		return 1;
+	}
+}
+
+int Repository::rpush(const std::string& key, const std::string& value)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<std::deque<std::string>>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		auto& deq = std::get<std::deque<std::string>>(it->second.value);
+		deq.push_back(value);
+		m_isCacheDirty = true;
+		return deq.size();
+	}
+	else {
+		m_data[key] = { std::deque<std::string>{value}, std::nullopt };
+		m_isCacheDirty = true;
+		return 1;
+	}
+}
+
 bool Repository::expires(const std::string& key, int seconds)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
@@ -41,7 +79,7 @@ bool Repository::expires(const std::string& key, int seconds)
 	return false;
 }
 
-std::string Repository::get(const std::string& key)
+std::optional<std::variant<std::string, std::deque<std::string>>> Repository::get(const std::string& key)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
 		auto now = std::chrono::steady_clock::now();
@@ -57,14 +95,14 @@ std::string Repository::get(const std::string& key)
 					}
 				}
 
-				return "";
+				return std::nullopt;
 			}
 		}
 
 		return it->second.value;
 	}
 
-	return "";
+	return std::nullopt;
 }
 
 bool Repository::del(const std::string& key)
@@ -94,8 +132,17 @@ size_t Repository::getMemoryUsed()
 	if (m_isCacheDirty) {
 		m_cachedMemoryUsed = 0;
 		for (const auto& [key, record] : m_data) {
-			m_cachedMemoryUsed += key.size() + record.value.size();
-			m_cachedMemoryUsed += sizeof(std::pair<const std::string, Record>) + 24;
+			m_cachedMemoryUsed += key.size() + sizeof(std::pair<const std::string, Record>) + 24;
+
+			if (auto* str = std::get_if<std::string>(&record.value)) {
+				m_cachedMemoryUsed += str->size();
+			}
+			else if (auto* deq = std::get_if<std::deque<std::string>>(&record.value)) {
+				m_cachedMemoryUsed += sizeof(std::deque<std::string>);
+				for (const auto& item : *deq) {
+					m_cachedMemoryUsed += item.size();
+				}
+			}
 		}
 
 		m_isCacheDirty = false;

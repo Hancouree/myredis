@@ -24,13 +24,23 @@ std::string GetHandler::execute(const std::vector<std::string>& args, std::share
         return "-ERR wrong number of arguments for GET\r\n";
     }
 
-    std::string val = serverCtx->m_repo->get(args[1]);
-    if (val.empty()) {
-        return "$-1\r\n";
+    auto val = serverCtx->m_repo->get(args[1]);
+    if (!val.has_value()) return "$-1\r\n";
+
+    if (auto* str = std::get_if<std::string>(&val.value())) {
+        return "$" + std::to_string(str->size()) + "\r\n" + *str + "\r\n";
     }
-    else {
-        return "$" + std::to_string(val.size()) + "\r\n" + val + "\r\n";
+    else if (auto* deq = std::get_if<std::deque<std::string>>(&val.value())) {
+        std::stringstream ss;
+        ss << "*" << deq->size() << "\r\n";
+        for (const auto& e : *deq) {
+            ss << "$" << e.size() << "\r\n" << e << "\r\n";
+        }
+
+        return ss.str();
     }
+
+    return "-ERR internal error\r\n";
 }
 
 std::string ExpireHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
@@ -87,4 +97,38 @@ std::string InfoHandler::execute(const std::vector<std::string>& args, std::shar
 
     std::string result = ss.str();
     return "$" + std::to_string(result.size()) + "\r\n" + result + "\r\n";
+}
+
+std::string LPushHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return "-ERR wrong number of arguments for DEL\r\n";
+    }
+
+    try
+    {
+        int size = serverCtx->m_repo->lpush(args[1], args[2]);
+        return ":" + std::to_string(size) + "\r\n";
+    }
+    catch (const std::runtime_error& e)
+    {
+        return std::string("-ERR ") + e.what() + "\r\n";
+    }
+}
+
+std::string RPushHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return "-ERR wrong number of arguments for DEL\r\n";
+    }
+
+    try
+    {
+        int size = serverCtx->m_repo->rpush(args[1], args[2]);
+        return ":" + std::to_string(size) + "\r\n";
+    }
+    catch (const std::runtime_error& e)
+    {
+        return std::string("-ERR ") + e.what() + "\r\n";
+    }
 }

@@ -11,6 +11,8 @@ void Registry::init()
     m_handlers["EXPIRE"] = std::make_shared<ExpireHandler>();
     m_handlers["DEL"] = std::make_shared<DelHandler>();
     m_handlers["INFO"] = std::make_shared<InfoHandler>();
+    m_handlers["LPUSH"] = std::make_shared<LPushHandler>();
+    m_handlers["RPUSH"] = std::make_shared<RPushHandler>();
 }
 
 std::optional<std::string> Registry::handle(
