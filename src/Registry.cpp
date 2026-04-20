@@ -13,14 +13,14 @@ void Registry::init()
     m_handlers["INFO"] = std::make_shared<InfoHandler>();
 }
 
-void Registry::handle(
+std::optional<std::string> Registry::handle(
     const std::string& cmd, 
     const std::vector<std::string>& args, 
-    std::shared_ptr<ServerContext>& serverCtx, 
-    std::function<void(const std::string&)> callback
-)
-{
+    std::shared_ptr<ServerContext>& serverCtx
+) {
     if (auto it = m_handlers.find(cmd); it != m_handlers.end()) {
-        it->second->execute(args, serverCtx, callback);
+        return it->second->execute(args, serverCtx);
     }
+
+    return std::nullopt;
 }

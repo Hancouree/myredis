@@ -3,43 +3,40 @@
 #include <sstream>
 #include <windows.h>
 
-void PingHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx, std::function<void(const std::string&)> callback)
+std::string PingHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
-    callback("PONG\r\n");
+    return "PONG\r\n";
 }
 
-void SetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx, std::function<void(const std::string&)> callback)
+std::string SetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        callback("-ERR wrong number of arguments for SET\r\n");
-        return;
+        return "-ERR wrong number of arguments for SET\r\n";
     }
 
     serverCtx->m_repo->set(args[1], args[2]);
-    callback("+OK\r\n");
+    return "+OK\r\n";
 }
 
-void GetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx, std::function<void(const std::string&)> callback)
+std::string GetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        callback("-ERR wrong number of arguments for GET\r\n");
-        return;
+        return "-ERR wrong number of arguments for GET\r\n";
     }
 
     std::string val = serverCtx->m_repo->get(args[1]);
     if (val.empty()) {
-        callback("$-1\r\n");
+        return "$-1\r\n";
     }
     else {
-        callback("$" + std::to_string(val.size()) + "\r\n" + val + "\r\n");
+        return "$" + std::to_string(val.size()) + "\r\n" + val + "\r\n";
     }
 }
 
-void ExpireHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx, std::function<void(const std::string&)> callback)
+std::string ExpireHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        callback("-ERR wrong number of arguments for EXPIRE\r\n");
-        return;
+        return "-ERR wrong number of arguments for EXPIRE\r\n";
     }
 
     try
@@ -47,34 +44,33 @@ void ExpireHandler::execute(const std::vector<std::string>& args, std::shared_pt
         int seconds = std::stoi(args[2]);
 
         if (serverCtx->m_repo->expires(args[1], seconds)) {
-            callback(":1\r\n");
+            return ":1\r\n";
         }
         else {
-            callback(":0\r\n");
+            return ":0\r\n";
         }
     }
     catch (const std::exception&)
     {
-        callback("-ERR value is not an integer or out of range\r\n");
+        return "-ERR value is not an integer or out of range\r\n";
     }
 }
 
-void DelHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx, std::function<void(const std::string&)> callback)
+std::string DelHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        callback("-ERR wrong number of arguments for DEL\r\n");
-        return;
+        return "-ERR wrong number of arguments for DEL\r\n";
     }
 
     if (serverCtx->m_repo->del(args[1])) {
-        callback(":1\r\n");
+        return ":1\r\n";
     }
     else {
-        callback(":0\r\n");
+        return ":0\r\n";
     }
 }
 
-void InfoHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx, std::function<void(const std::string&)> callback)
+std::string InfoHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     auto now = std::chrono::steady_clock::now();
 
@@ -90,5 +86,5 @@ void InfoHandler::execute(const std::vector<std::string>& args, std::shared_ptr<
     ss << "total_commands_processed:" << serverCtx->getAllProcessedCommands() << "\r\n";
 
     std::string result = ss.str();
-    callback("$" + std::to_string(result.size()) + "\r\n" + result + "\r\n");
+    return "$" + std::to_string(result.size()) + "\r\n" + result + "\r\n";
 }

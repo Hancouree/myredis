@@ -1,6 +1,7 @@
 #include "../include/Session.h"
 #include "../include/Registry.h"
 #include <iostream>
+#include <numeric>
 
 Session::Session(tcp::socket s, std::shared_ptr<ServerContext> serverCtx)
     : m_socket(std::move(s))
@@ -21,12 +22,25 @@ void Session::doRead()
             if (!ec) {
                 self->m_buffer.commit(received);
 
+                std::vector<std::string> results;
                 std::vector<std::string> args;
                 while (self->m_parser.parse(self->m_buffer, args)) {
-                    self->handleCommand(args);
+                    std::optional<std::string> res = self->handleCommand(args);
+                    if (res.has_value()) {
+                        results.push_back(res.value());
+                        self->m_serverCtx->incrementProcessedCommands();
+                    }
+
                     args.clear();
                 }
 
+                size_t totalSize = 0;
+                for (const auto& s : results) totalSize += s.size();
+                std::string answer;
+                answer.reserve(totalSize);
+                for (const auto& s : results) answer += s;
+
+                self->doWrite(answer);
                 self->doRead();
             }
             else std::cout << ec.message() << "\n";
@@ -59,17 +73,12 @@ void Session::doWriteNext()
         });
 }
 
-void Session::handleCommand(std::vector<std::string>& args)
+std::optional<std::string> Session::handleCommand(std::vector<std::string>& args)
 {
-    if (args.empty()) return;
-
-    Registry::handle(
+    if (args.empty()) return std::nullopt;
+    return Registry::handle(
         args[0],
         args,
-        m_serverCtx,
-        [this](const std::string& answer) {
-            m_serverCtx->incrementProcessedCommands();
-            doWrite(answer);
-        }
+        m_serverCtx
     );
 }

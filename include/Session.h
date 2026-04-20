@@ -17,7 +17,7 @@ private:
     void doRead();
     void doWrite(const std::string& msg);
     void doWriteNext();
-    void handleCommand(std::vector<std::string>& args);
+    std::optional<std::string> handleCommand(std::vector<std::string>& args);
 
     tcp::socket m_socket;
     asio::streambuf m_buffer;
