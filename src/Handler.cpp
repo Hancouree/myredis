@@ -286,9 +286,8 @@ std::string HGetHandler::execute(const std::vector<std::string>& args, std::shar
 
     try
     {
-        std::optional<String> val = serverCtx->m_repo->hget(args[1], args[2]);
-        if (!val.has_value()) return Utils::nil();
-        return Utils::bulk(val.value());
+        std::optional<String> r = serverCtx->m_repo->hget(args[1], args[2]);
+        return Utils::nullableBulk(r);
     }
     catch (const std::exception& e)
     {
@@ -355,6 +354,57 @@ std::string HLenHandler::execute(const std::vector<std::string>& args, std::shar
     try
     {
         return Utils::integer(serverCtx->m_repo->hlen(args[1]));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string HKeysHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for HKEYS");
+    }
+
+    try
+    {
+        return Utils::list(serverCtx->m_repo->hkeys(args[1]));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string HValsHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for HVALS");
+    }
+
+    try
+    {
+        return Utils::list(serverCtx->m_repo->hvals(args[1]));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string HMGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return Utils::error("wrong number of arguments for HMGET");
+    }
+
+    try
+    {
+        std::vector<std::optional<std::string>> results = serverCtx->m_repo->hmget(args[1], { args.begin() + 2, args.end() });
+        std::string out = "*" + std::to_string(results.size()) + "\r\n";
+        for (const auto& r : results) out += Utils::nullableBulk(r);
+        return out;
     }
     catch (const std::exception& e)
     {

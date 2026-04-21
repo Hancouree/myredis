@@ -11,6 +11,11 @@ namespace Utils {
         return "$" + std::to_string(str.size()) + "\r\n" + str + "\r\n";
     }
 
+    std::string nullableBulk(const std::optional<std::string>& s)
+    {
+        return s.has_value() ? Utils::bulk(s.value()) : Utils::nil();
+    }
+
     std::string list(const std::deque<std::string>& l)
     {
         std::string out = "*" + std::to_string(l.size()) + "\r\n";

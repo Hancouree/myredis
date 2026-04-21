@@ -47,6 +47,9 @@ public:
 	bool hdel(const std::string& key, const std::string& field);
 	bool hexists(const std::string& key, const std::string& field);
 	int hlen(const std::string& key);
+	List hkeys(const std::string& key);
+	List hvals(const std::string& key);
+	std::vector<std::optional<String>> hmget(const std::string& key, const std::vector<std::string>& fields);
 private:
 	std::unordered_map<std::string, Record> m_data;
 	std::multimap<std::chrono::steady_clock::time_point, std::string> m_expiringKeys;

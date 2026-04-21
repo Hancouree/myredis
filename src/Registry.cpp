@@ -29,6 +29,9 @@ void Registry::init()
     m_handlers["HDEL"] = std::make_shared<HDelHandler>();
     m_handlers["HEXISTS"] = std::make_shared<HExistsHandler>();
     m_handlers["HLEN"] = std::make_shared<HLenHandler>();
+    m_handlers["HKEYS"] = std::make_shared<HKeysHandler>();
+    m_handlers["HVALS"] = std::make_shared<HValsHandler>();
+    m_handlers["HMGET"] = std::make_shared<HMGetHandler>();
 }
 
 std::string Registry::handle(

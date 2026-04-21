@@ -186,3 +186,27 @@ public:
         std::shared_ptr<ServerContext>& serverCtx
     ) override;
 };
+
+class HKeysHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class HValsHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class HMGetHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};

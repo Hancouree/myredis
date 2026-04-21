@@ -426,3 +426,58 @@ int Repository::hlen(const std::string& key)
 
 	return 0;
 }
+
+List Repository::hkeys(const std::string& key)
+{
+	auto it = m_data.find(key);
+	if (it == m_data.end()) return {};
+
+	if (!std::holds_alternative<Hash>(it->second.value)) {
+		throw std::runtime_error("WRONGTYPE");
+	}
+
+	auto& h = std::get<Hash>(it->second.value);
+	
+	List l;
+	for (const auto& [k, _] : h) l.push_back(k);
+	return l;
+}
+
+List Repository::hvals(const std::string& key)
+{
+	auto it = m_data.find(key);
+	if (it == m_data.end()) return {};
+
+	if (!std::holds_alternative<Hash>(it->second.value)) {
+		throw std::runtime_error("WRONGTYPE");
+	}
+
+	auto& h = std::get<Hash>(it->second.value);
+
+	List l;
+	for (const auto& [_, v] : h) l.push_back(v);
+	return l;
+}
+
+std::vector<std::optional<String>> Repository::hmget(const std::string& key, const std::vector<std::string>& fields)
+{
+	auto it = m_data.find(key);
+	if (it == m_data.end()) return {};
+
+	if (!std::holds_alternative<Hash>(it->second.value)) {
+		throw std::runtime_error("WRONGTYPE");
+	}
+
+	std::vector<std::optional<String>> results;
+
+	auto& h = std::get<Hash>(it->second.value);
+	for (const auto& f : fields) {
+		auto e_it = h.find(f);
+		if (e_it != h.end())
+			results.push_back(e_it->second);
+		else
+			results.push_back(std::nullopt);
+	}
+
+	return results;
+}
