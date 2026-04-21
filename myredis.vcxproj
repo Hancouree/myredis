@@ -138,6 +138,7 @@
     <ClCompile Include="src\Repository.cpp" />
     <ClCompile Include="src\ServerContext.cpp" />
     <ClCompile Include="src\Session.cpp" />
+    <ClCompile Include="src\Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Cleaner.h" />
@@ -148,6 +149,7 @@
     <ClInclude Include="include\Repository.h" />
     <ClInclude Include="include\ServerContext.h" />
     <ClInclude Include="include\Session.h" />
+    <ClInclude Include="include\Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
