@@ -88,6 +88,92 @@ bool Repository::del(const std::string& key)
 	return false;
 }
 
+int Repository::incrBy(const std::string& key, int delta)
+{
+	auto it = m_data.find(key);
+	int val = 0;
+	if (it != m_data.end()) {
+		if (!std::holds_alternative<String>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		val = std::stoi(std::get<String>(it->second.value));
+	}
+	val += delta;
+	m_data[key] = { std::to_string(val), std::nullopt };
+	m_isCacheDirty = true;
+	return val;
+}
+
+int Repository::decrBy(const std::string& key, int delta)
+{
+	auto it = m_data.find(key);
+	int val = 0;
+	if (it != m_data.end()) {
+		if (!std::holds_alternative<String>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		val = std::stoi(std::get<String>(it->second.value));
+	}
+	val -= delta;
+	m_data[key] = { std::to_string(val), std::nullopt };
+	m_isCacheDirty = true;
+	return val;
+}
+
+int Repository::append(const std::string& key, const std::string& value)
+{
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<String>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		auto& s = std::get<String>(it->second.value);
+		s += value;
+		m_isCacheDirty = true;
+		return s.size();
+	}
+	else {
+		m_data[key] = { value, std::nullopt };
+		m_isCacheDirty = true;
+		return value.size();
+	}
+}
+
+int Repository::strlen(const std::string& key)
+{
+	auto it = m_data.find(key);
+	if (it == m_data.end()) return 0;
+
+	if (!std::holds_alternative<String>(it->second.value)) {
+		throw std::runtime_error("WRONGTYPE");
+	}
+
+	return std::get<String>(it->second.value).size();
+}
+
+std::vector<std::optional<String>> Repository::mget(const std::vector<std::string>& keys)
+{
+	std::vector<std::optional<String>> out;
+	for (const auto& k : keys) {
+		auto it = m_data.find(k);
+		if (it == m_data.end()) {
+			out.push_back(std::nullopt);
+			continue;
+		}
+
+		if (auto* s = std::get_if<String>(&it->second.value)) {
+			out.push_back(*s);
+		}
+		else {
+			out.push_back(std::nullopt);
+		}
+	}
+
+	return out;
+}
+
 size_t Repository::getMemoryUsed()
 {
 	if (m_isCacheDirty) {

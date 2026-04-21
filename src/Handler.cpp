@@ -84,6 +84,121 @@ std::string InfoHandler::execute(const std::vector<std::string>& args, std::shar
     return Utils::bulk(ss.str());
 }
 
+std::string IncrHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for INCR");
+    }
+
+    try
+    {
+        return Utils::integer(serverCtx->m_repo->incrBy(args[1]));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string IncrByHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return Utils::error("wrong number of arguments for INCRBY");
+    }
+
+    try
+    {
+        return Utils::integer(serverCtx->m_repo->incrBy(args[1], std::stoi(args[2])));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string DecrHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for DECR");
+    }
+
+    try
+    {
+        return Utils::integer(serverCtx->m_repo->decrBy(args[1]));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string DecrByHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return Utils::error("wrong number of arguments for DECRBY");
+    }
+
+    try
+    {
+        return Utils::integer(serverCtx->m_repo->decrBy(args[1], std::stoi(args[2])));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string StrlenHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for STRLEN");
+    }
+
+    try
+    {
+        return Utils::integer(serverCtx->m_repo->strlen(args[1]));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string AppendHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return Utils::error("wrong number of arguments for APPEND");
+    }
+
+    try
+    {
+        return Utils::integer(serverCtx->m_repo->append(args[1], args[2]));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string MGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for MGET");
+    }
+
+    try
+    {
+        std::vector<std::optional<String>> results = serverCtx->m_repo->mget({ args.begin() + 1, args.end() });
+        std::string out = "*" + std::to_string(results.size()) + "\r\n";
+        for (const auto& r : results) out += Utils::nullableBulk(r);
+        return out;
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
 std::string LPushHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {

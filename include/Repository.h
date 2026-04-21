@@ -25,6 +25,11 @@ public:
 	bool expires(const std::string& key, int seconds);
 	const RecordValue* get(const std::string& key);
 	bool del(const std::string& key);
+	int incrBy(const std::string& key, int delta = 1);
+	int decrBy(const std::string& key, int delta = 1);
+	int append(const std::string& key, const std::string& value);
+	int strlen(const std::string& key);
+	std::vector<std::optional<String>> mget(const std::vector<std::string>& keys);
 	size_t getMemoryUsed();
 	size_t count() const;
 

@@ -59,6 +59,62 @@ public:
     ) override;
 };
 
+class IncrHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class IncrByHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class DecrHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class DecrByHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class StrlenHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class AppendHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class MGetHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
 class LPushHandler : public Handler {
 public:
     std::string execute(

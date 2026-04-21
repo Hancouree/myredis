@@ -11,6 +11,13 @@ void Registry::init()
     m_handlers["EXPIRE"] = std::make_shared<ExpireHandler>();
     m_handlers["DEL"] = std::make_shared<DelHandler>();
     m_handlers["INFO"] = std::make_shared<InfoHandler>();
+    m_handlers["INCR"] = std::make_shared<IncrHandler>();
+    m_handlers["INCRBY"] = std::make_shared<IncrByHandler>();
+    m_handlers["DECR"] = std::make_shared<DecrHandler>();
+    m_handlers["DECRBY"] = std::make_shared<DecrByHandler>();
+    m_handlers["APPEND"] = std::make_shared<AppendHandler>();
+    m_handlers["STRLEN"] = std::make_shared<StrlenHandler>();
+    m_handlers["MGET"] = std::make_shared<MGetHandler>();
 
     m_handlers["LPUSH"] = std::make_shared<LPushHandler>();
     m_handlers["RPUSH"] = std::make_shared<RPushHandler>();
