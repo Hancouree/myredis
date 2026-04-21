@@ -75,6 +75,70 @@ public:
     ) override;
 };
 
+class LPopHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class RPopHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class LLenHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class LIndexHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class LRangeHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class LInsertHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class LSetHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class LTrimHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
 class HSetHandler : public Handler {
 public:
     std::string execute(

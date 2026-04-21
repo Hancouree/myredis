@@ -1,8 +1,8 @@
 #include "../include/Handler.h"
 #include "../include/ServerContext.h"
 #include "../include/Utils.h"
-#include <sstream>
 #include <windows.h>
+#include <algorithm>
 
 std::string PingHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
@@ -52,9 +52,9 @@ std::string ExpireHandler::execute(const std::vector<std::string>& args, std::sh
         int seconds = std::stoi(args[2]);
         return serverCtx->m_repo->expires(args[1], seconds) ? Utils::integer(1) : Utils::integer(0);
     }
-    catch (const std::exception&)
+    catch (const std::exception& e)
     {
-        return Utils::error("value is not an integer or out of range");
+        return Utils::error(e.what());
     }
 }
 
@@ -95,7 +95,7 @@ std::string LPushHandler::execute(const std::vector<std::string>& args, std::sha
         int size = serverCtx->m_repo->lpush(args[1], args[2]);
         return Utils::integer(size);
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
     {
         return Utils::error(e.what());
     }
@@ -112,7 +112,150 @@ std::string RPushHandler::execute(const std::vector<std::string>& args, std::sha
         int size = serverCtx->m_repo->rpush(args[1], args[2]);
         return Utils::integer(size);
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string LPopHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx) {
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for LPOP");
+    }
+
+    try
+    {
+        std::optional<String> val = serverCtx->m_repo->lpop(args[1]);
+        if (!val.has_value()) return Utils::nil();
+        return Utils::bulk(val.value());
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string RPopHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for RPOP");
+    }
+
+    try
+    {
+        std::optional<String> val = serverCtx->m_repo->rpop(args[1]);
+        if (!val.has_value()) return Utils::nil();
+        return Utils::bulk(val.value());
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string LLenHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::error("wrong number of arguments for LLEN");
+    }
+
+    try
+    {
+        return Utils::integer(serverCtx->m_repo->llen(args[1]));
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string LIndexHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return Utils::error("wrong number of arguments for LINDEX");
+    }
+
+    try
+    {
+        std::optional<std::string> val = serverCtx->m_repo->lindex(args[1], std::stoi(args[2]));
+        if (!val.has_value()) return Utils::nil();
+        return Utils::bulk(val.value());
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string LRangeHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 4) {
+        return Utils::error("wrong number of arguments for LRANGE");
+    }
+
+    try
+    {
+        const List& l = serverCtx->m_repo->lrange(args[1], std::stoi(args[2]), std::stoi(args[3]));
+        return Utils::list(l);
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string LInsertHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 5) {
+        return Utils::error("wrong number of arguments for LINSERT");
+    }
+
+    try
+    {
+        std::string where = args[2];
+        std::transform(where.begin(), where.end(), where.begin(), ::toupper);
+        if (where != "BEFORE" && where != "AFTER") {
+            return Utils::error("syntax error");
+        }
+
+        int size = serverCtx->m_repo->linsert(args[1], where, args[3], args[4]);
+        return Utils::integer(size);
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string LSetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 4) {
+        return Utils::error("wrong number of arguments for LSET");
+    }
+
+    try
+    {
+        serverCtx->m_repo->lset(args[1], std::stoi(args[2]), args[3]);
+        return Utils::ok();
+    }
+    catch (const std::exception& e)
+    {
+        return Utils::error(e.what());
+    }
+}
+
+std::string LTrimHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 4) {
+        return Utils::error("wrong number of arguments for LTRIM");
+    }
+
+    try
+    {
+        serverCtx->m_repo->ltrim(args[1], std::stoi(args[2]), std::stoi(args[3]));
+        return Utils::ok();
+    }
+    catch (const std::exception& e)
     {
         return Utils::error(e.what());
     }
@@ -129,7 +272,7 @@ std::string HSetHandler::execute(const std::vector<std::string>& args, std::shar
         int size = serverCtx->m_repo->hset(args[1], args[2], args[3]);
         return Utils::integer(size);
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
     {
         return Utils::error(e.what());
     }
@@ -147,7 +290,7 @@ std::string HGetHandler::execute(const std::vector<std::string>& args, std::shar
         if (!val.has_value()) return Utils::nil();
         return Utils::bulk(val.value());
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
     {
         return Utils::error(e.what());
     }
@@ -165,7 +308,7 @@ std::string HGetAllHandler::execute(const std::vector<std::string>& args, std::s
         if (!h) return Utils::emptyArr();
         return Utils::hash(*h);
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
     {
         return Utils::error(e.what());
     }
@@ -181,7 +324,7 @@ std::string HDelHandler::execute(const std::vector<std::string>& args, std::shar
     {
         return serverCtx->m_repo->hdel(args[1], args[2]) ? Utils::integer(1) : Utils::integer(0);
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
     {
         return Utils::error(e.what());
     }
@@ -197,7 +340,7 @@ std::string HExistsHandler::execute(const std::vector<std::string>& args, std::s
     {
         return serverCtx->m_repo->hexists(args[1], args[2]) ? Utils::integer(1) : Utils::integer(0);
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
     {
         return Utils::error(e.what());
     }
@@ -213,7 +356,7 @@ std::string HLenHandler::execute(const std::vector<std::string>& args, std::shar
     {
         return Utils::integer(serverCtx->m_repo->hlen(args[1]));
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
     {
         return Utils::error(e.what());
     }
