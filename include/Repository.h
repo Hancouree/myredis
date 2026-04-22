@@ -26,7 +26,6 @@ public:
 	const RecordValue* get(const std::string& key);
 	bool del(const std::string& key);
 	int incrBy(const std::string& key, int delta = 1);
-	int decrBy(const std::string& key, int delta = 1);
 	int append(const std::string& key, const std::string& value);
 	int strlen(const std::string& key);
 	std::vector<std::optional<String>> mget(const std::vector<std::string>& keys);
@@ -35,9 +34,6 @@ public:
 	bool persist(const std::string& key);
 	void rename(const std::string& key, const std::string& newKey);
 	List keys(const std::string& pattern);
-	
-	size_t getMemoryUsed();
-	size_t count() const;
 
 	//LIST
 	int lpush(const std::string& key, const std::string& value);
@@ -61,9 +57,23 @@ public:
 	List hkeys(const std::string& key);
 	List hvals(const std::string& key);
 	std::vector<std::optional<String>> hmget(const std::string& key, const std::vector<std::string>& fields);
+
+	size_t getMemoryUsed();
+	size_t count() const;
 private:
 	void dropExpiration(const std::chrono::steady_clock::time_point& tp, const std::string& key);
 	bool isExpired(const std::optional<std::chrono::steady_clock::time_point>& tp);
+	
+	template <typename T>
+	T* getTyped(const std::string& key) {
+		auto it = m_data.find(key);
+		if (it == m_data.end()) return nullptr;
+		if (!std::holds_alternative<T>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		return &std::get<T>(it->second.value);
+	}
 
 	std::unordered_map<std::string, Record> m_data;
 	std::multimap<std::chrono::steady_clock::time_point, std::string> m_expiringKeys;

@@ -68,67 +68,36 @@ bool Repository::del(const std::string& key)
 
 int Repository::incrBy(const std::string& key, int delta)
 {
-	auto it = m_data.find(key);
-	int val = 0;
-	if (it != m_data.end()) {
-		if (!std::holds_alternative<String>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		val = std::stoi(std::get<String>(it->second.value));
-	}
-	val += delta;
-	m_data[key] = { std::to_string(val), std::nullopt };
+	int value = 0;
+	String* s = getTyped<String>(key);
+	if (s) value = std::stoi(*s);
+	value += delta;
+	m_data[key] = { std::to_string(value), std::nullopt };
 	m_isCacheDirty = true;
-	return val;
-}
-
-int Repository::decrBy(const std::string& key, int delta)
-{
-	auto it = m_data.find(key);
-	int val = 0;
-	if (it != m_data.end()) {
-		if (!std::holds_alternative<String>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		val = std::stoi(std::get<String>(it->second.value));
-	}
-	val -= delta;
-	m_data[key] = { std::to_string(val), std::nullopt };
-	m_isCacheDirty = true;
-	return val;
+	return value;
 }
 
 int Repository::append(const std::string& key, const std::string& value)
 {
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<String>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& s = std::get<String>(it->second.value);
-		s += value;
-		m_isCacheDirty = true;
-		return s.size();
+	int size = 0;
+	String* s = getTyped<String>(key);
+	if (s) {
+		*s += value;
+		size = s->size();
 	}
 	else {
 		m_data[key] = { value, std::nullopt };
-		m_isCacheDirty = true;
-		return value.size();
+		size = value.size();
 	}
+
+	m_isCacheDirty = true;
+	return size;
 }
 
 int Repository::strlen(const std::string& key)
 {
-	auto it = m_data.find(key);
-	if (it == m_data.end()) return 0;
-
-	if (!std::holds_alternative<String>(it->second.value)) {
-		throw std::runtime_error("WRONGTYPE");
-	}
-
-	return std::get<String>(it->second.value).size();
+	String* s = getTyped<String>(key);
+	return s ? s->size() : 0;
 }
 
 std::vector<std::optional<String>> Repository::mget(const std::vector<std::string>& keys)
@@ -221,15 +190,251 @@ void Repository::rename(const std::string& key, const std::string& newKey)
 
 List Repository::keys(const std::string& pattern)
 {
-	auto now = std::chrono::steady_clock::now();
 	List l;
 	for (auto it = m_data.begin(); it != m_data.end(); ++it) {
-		if (Utils::matches(it->first, pattern)) {
-			if (!isExpired(it->second.expires_at)) l.push_back(it->first);
+		std::string key = it->first;
+
+		if (Utils::matches(key, pattern) && !isExpired(it->second.expires_at)) {
+			l.push_back(key);
 		}
 	}
 
 	return l;
+}
+
+int Repository::lpush(const std::string& key, const std::string& value)
+{
+	int size = 0;
+	List* l = getTyped<List>(key);
+
+	if (l) {
+		l->push_front(value);
+		size = l->size();
+	}
+	else {
+		m_data[key] = { List{value}, std::nullopt };
+		size = 1;
+	}
+
+	m_isCacheDirty = true;
+	return size;
+}
+
+int Repository::rpush(const std::string& key, const std::string& value)
+{
+	int size = 0;
+	List* l = getTyped<List>(key);
+
+	if (l) {
+		l->push_back(value);
+		size = l->size();
+	}
+	else {
+		m_data[key] = { List{value}, std::nullopt };
+		size = 1;
+	}
+
+	m_isCacheDirty = true;
+	return size;
+}
+
+std::optional<String> Repository::lpop(const std::string& key)
+{
+	List* l = getTyped<List>(key);
+	if (!l || l->empty()) return std::nullopt;
+
+	std::string popped = l->front();
+	l->pop_front();
+	m_isCacheDirty = true;
+	if (l->empty()) del(key);
+	return popped;
+}
+
+std::optional<String> Repository::rpop(const std::string& key)
+{
+	List* l = getTyped<List>(key);
+	if (!l || l->empty()) return std::nullopt;
+
+	std::string popped = l->back();
+	l->pop_back();
+	m_isCacheDirty = true;
+	if (l->empty()) del(key);
+	return popped;
+}
+
+int Repository::llen(const std::string& key)
+{
+	List* l = getTyped<List>(key);
+	return l ? l->size() : 0;
+}
+
+std::optional<String> Repository::lindex(const std::string& key, int idx)
+{
+	List* l = getTyped<List>(key);
+	if (!l) return std::nullopt;
+	if (idx < 0) idx = (int)l->size() + idx;
+	if (idx >= 0 && idx < (int)l->size()) return l->at(idx);
+	return std::nullopt;
+}
+
+List Repository::lrange(const std::string& key, int start, int stop)
+{
+	List* l = getTyped<List>(key);
+	if (!l) return {};
+
+	int size = l->size();
+	if (start < 0) start = size + start;
+	if (stop < 0)  stop = size + stop;
+	start = std::max(start, 0);
+	stop = std::min(stop, size - 1); 
+	if (start > stop) return {};
+	return List(l->begin() + start, l->begin() + stop + 1);
+}
+
+int Repository::linsert(const std::string& key, const std::string& where, const std::string& pivot, const std::string& value)
+{
+	List* l = getTyped<List>(key);
+	if (!l) return 0;
+
+	auto pivot_it = std::find(l->begin(), l->end(), pivot);
+	if (pivot_it == l->end()) return -1;
+
+	if (where == "BEFORE") {
+		l->insert(pivot_it, value);
+		m_isCacheDirty = true;
+	}
+	else if (where == "AFTER") {
+		l->insert(pivot_it + 1, value);
+		m_isCacheDirty = true;
+	}
+
+	return l->size();
+}
+
+void Repository::lset(const std::string& key, int idx, const std::string& value)
+{
+	List* l = getTyped<List>(key);
+	if (!l) throw std::runtime_error("no such key");
+
+	if (idx < 0) idx = l->size() + idx;
+	if (idx < 0 || idx >= l->size()) 
+		throw std::runtime_error("index out of range");
+
+	(*l)[idx] = value;
+	m_isCacheDirty = true;
+}
+
+void Repository::ltrim(const std::string& key, int start, int stop)
+{
+	List* l = getTyped<List>(key);
+	if (!l) return;
+
+	if (start < 0) start = l->size() + start;
+	if (stop < 0) stop = l->size() + stop;
+
+	start = std::max(start, 0);
+	stop = std::min(stop, (int)l->size() - 1);
+	if (start > stop) { del(key); return; }
+
+	*l = List(l->begin() + start, l->begin() + stop + 1);
+}
+
+int Repository::hset(const std::string& key, const std::string& field, const std::string& value)
+{
+	Hash* h = getTyped<Hash>(key);
+	if (h) {
+		auto [it_h, inserted] = h->insert_or_assign(field, value);
+		m_isCacheDirty = true;
+		return inserted ? 1 : 0;
+	}
+	m_data[key] = { Hash{{field, value}}, std::nullopt };
+	m_isCacheDirty = true;
+	return 1;
+}
+
+std::optional<String> Repository::hget(const std::string& key, const std::string& field)
+{
+	Hash* h = getTyped<Hash>(key);
+	if (!h) return std::nullopt;
+	auto it = h->find(field);
+	return it != h->end() ? std::optional<String>(it->second) : std::nullopt;
+}
+
+const Hash* Repository::hgetall(const std::string& key)
+{
+	return getTyped<Hash>(key);
+}
+
+bool Repository::hdel(const std::string& key, const std::string& field)
+{
+	Hash* h = getTyped<Hash>(key);
+	if (!h) return false;
+	bool erased = h->erase(field) > 0;
+	if (erased) {
+		m_isCacheDirty = true;
+		if (h->empty()) del(key);
+	}
+	return erased;
+}
+
+bool Repository::hexists(const std::string& key, const std::string& field)
+{
+	Hash* h = getTyped<Hash>(key);
+	return h ? h->contains(field) : false;
+}
+
+int Repository::hlen(const std::string& key)
+{
+	Hash* h = getTyped<Hash>(key);
+	return h ? (int)h->size() : 0;
+}
+
+List Repository::hkeys(const std::string& key)
+{
+	Hash* h = getTyped<Hash>(key);
+	if (!h) return {};
+	List l;
+	for (const auto& [k, _] : *h) l.push_back(k);
+	return l;
+}
+
+List Repository::hvals(const std::string& key)
+{
+	Hash* h = getTyped<Hash>(key);
+	if (!h) return {};
+	List l;
+	for (const auto& [_, v] : *h) l.push_back(v);
+	return l;
+}
+
+std::vector<std::optional<String>> Repository::hmget(const std::string& key, const std::vector<std::string>& fields)
+{
+	Hash* h = getTyped<Hash>(key);
+	std::vector<std::optional<String>> results;
+	for (const auto& f : fields) {
+		if (!h) { results.push_back(std::nullopt); continue; }
+		auto it = h->find(f);
+		results.push_back(it != h->end() ? std::optional<String>(it->second) : std::nullopt);
+	}
+	return results;
+}
+
+void Repository::dropExpiration(const std::chrono::steady_clock::time_point& tp, const std::string& key)
+{
+	auto range = m_expiringKeys.equal_range(tp);
+	for (auto it = range.first; it != range.second; ++it) {
+		if (it->second == key) {
+			m_expiringKeys.erase(it);
+			break;
+		}
+	}
+}
+
+bool Repository::isExpired(const std::optional<std::chrono::steady_clock::time_point>& tp)
+{
+	if (!tp.has_value()) return false;
+	auto now = std::chrono::steady_clock::now();
+	return now >= tp;
 }
 
 size_t Repository::getMemoryUsed()
@@ -265,380 +470,4 @@ size_t Repository::getMemoryUsed()
 size_t Repository::count() const
 {
 	return m_data.size();
-}
-
-int Repository::lpush(const std::string& key, const std::string& value)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<List>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& l = std::get<List>(it->second.value);
-		l.push_front(value);
-		m_isCacheDirty = true;
-		return l.size();
-	}
-	else {
-		m_data[key] = { List{value}, std::nullopt };
-		m_isCacheDirty = true;
-		return 1;
-	}
-}
-
-int Repository::rpush(const std::string& key, const std::string& value)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<List>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& l = std::get<List>(it->second.value);
-		l.push_back(value);
-		m_isCacheDirty = true;
-		return l.size();
-	}
-	else {
-		m_data[key] = { List{value}, std::nullopt };
-		m_isCacheDirty = true;
-		return 1;
-	}
-}
-
-std::optional<String> Repository::lpop(const std::string& key)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<List>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& l = std::get<List>(it->second.value);
-		if (!l.empty()) {
-			std::string popped = l.front();
-			l.pop_front();
-			m_isCacheDirty = true;
-			if (l.empty()) {
-				del(key);
-			}
-
-			return popped;
-		}
-	}
-	
-	return std::nullopt;
-}
-
-std::optional<String> Repository::rpop(const std::string& key)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<List>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& l = std::get<List>(it->second.value);
-		if (!l.empty()) {
-			std::string popped = l.back();
-			l.pop_back();
-			m_isCacheDirty = true;
-			if (l.empty()) {
-				del(key);
-			}
-
-			return popped;
-		}
-	}
-
-	return std::nullopt;
-}
-
-int Repository::llen(const std::string& key)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<List>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		return std::get<List>(it->second.value).size();
-	}
-
-	return 0;
-}
-
-std::optional<String> Repository::lindex(const std::string& key, int idx)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<List>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& l = std::get<List>(it->second.value);
-		if (idx < 0) idx = l.size() + idx;
-		if (idx >= 0 && idx < l.size()) return l[idx];
-	}
-
-	return std::nullopt;
-}
-
-List Repository::lrange(const std::string& key, int start, int stop)
-{
-	auto it = m_data.find(key);
-	if (it == m_data.end()) return {};
-
-	if (!std::holds_alternative<List>(it->second.value)) {
-		throw std::runtime_error("WRONGTYPE");
-	}
-
-	auto& l = std::get<List>(it->second.value);
-	int size = l.size();
-
-	if (start < 0) start = size + start;
-	if (stop < 0)  stop = size + stop;
-
-	start = std::max(start, 0);
-	stop = std::min(stop, size - 1);
-
-	if (start > stop) return {};
-
-	return List(l.begin() + start, l.begin() + stop + 1);
-}
-
-int Repository::linsert(const std::string& key, const std::string& where, const std::string& pivot, const std::string& value)
-{
-	auto it = m_data.find(key);
-	if (it == m_data.end()) return 0;
-	
-	if (!std::holds_alternative<List>(it->second.value)) {
-		throw std::runtime_error("WRONGTYPE");
-	}
-
-	auto& l = std::get<List>(it->second.value);
-	
-	auto pivot_it = std::find(l.begin(), l.end(), pivot);
-	if (pivot_it == l.end()) return -1;
-
-	if (where == "BEFORE") {
-		l.insert(pivot_it, value);
-		m_isCacheDirty = true;
-	}
-	else if (where == "AFTER") {
-		l.insert(pivot_it + 1, value);
-		m_isCacheDirty = true;
-	}
-
-	return l.size();
-}
-
-void Repository::lset(const std::string& key, int idx, const std::string& value)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<List>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& l = std::get<List>(it->second.value);
-		if (idx < 0) idx = l.size() + idx;
-		if (idx < 0 || idx >= l.size()) {
-			throw std::runtime_error("index out of range");
-		}
-
-		l[idx] = value;
-		m_isCacheDirty = true;
-	}
-	else {
-		throw std::runtime_error("no such key");
-	}
-}
-
-void Repository::ltrim(const std::string& key, int start, int stop)
-{
-	auto it = m_data.find(key);
-	if (it == m_data.end()) return;
-
-	if (!std::holds_alternative<List>(it->second.value)) {
-		throw std::runtime_error("WRONGTYPE");
-	}
-
-	auto& l = std::get<List>(it->second.value);
-
-	if (start < 0) start = l.size() + start;
-	if (stop < 0) stop = l.size() + stop;
-
-	start = std::max(start, 0);
-	stop = std::min(stop, (int)l.size() - 1);
-	if (start > stop) { del(key); return; }
-
-	l = List(l.begin() + start, l.begin() + stop + 1);
-	if (l.empty()) {
-		del(key);
-	}
-}
-
-int Repository::hset(const std::string& key, const std::string& field, const std::string& value)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<Hash>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& h = std::get<Hash>(it->second.value);
-		auto [it_h, inserted] = h.insert_or_assign(field, value);
-		m_isCacheDirty = true;
-		return inserted ? 1 : 0;
-	}
-	else {
-		m_data[key] = { Hash{ { field, value} }, std::nullopt };
-		m_isCacheDirty = true;
-		return 1;
-	}
-}
-
-std::optional<String> Repository::hget(const std::string& key, const std::string& field)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<Hash>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& h = std::get<Hash>(it->second.value);
-		if (auto it_h = h.find(field); it_h != h.end()) {
-			return it_h->second;
-		}
-
-		return std::nullopt;
-	}
-
-	return std::nullopt;
-}
-
-const Hash* Repository::hgetall(const std::string& key)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<Hash>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& h = std::get<Hash>(it->second.value);
-		return &h;
-	}
-
-	return nullptr;
-}
-
-bool Repository::hdel(const std::string& key, const std::string& field)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<Hash>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& h = std::get<Hash>(it->second.value);
-		bool erased = h.erase(field) > 0;
-		if (erased) { 
-			m_isCacheDirty = true; 
-			if (h.empty()) del(key);
-		}
-		return erased;
-	}
-
-	return false;
-}
-
-bool Repository::hexists(const std::string& key, const std::string& field)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<Hash>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		auto& h = std::get<Hash>(it->second.value);
-		return h.contains(field);
-	}
-
-	return false;
-}
-
-int Repository::hlen(const std::string& key)
-{
-	if (auto it = m_data.find(key); it != m_data.end()) {
-		if (!std::holds_alternative<Hash>(it->second.value)) {
-			throw std::runtime_error("WRONGTYPE");
-		}
-
-		return std::get<Hash>(it->second.value).size();
-	}
-
-	return 0;
-}
-
-List Repository::hkeys(const std::string& key)
-{
-	auto it = m_data.find(key);
-	if (it == m_data.end()) return {};
-
-	if (!std::holds_alternative<Hash>(it->second.value)) {
-		throw std::runtime_error("WRONGTYPE");
-	}
-
-	auto& h = std::get<Hash>(it->second.value);
-	
-	List l;
-	for (const auto& [k, _] : h) l.push_back(k);
-	return l;
-}
-
-List Repository::hvals(const std::string& key)
-{
-	auto it = m_data.find(key);
-	if (it == m_data.end()) return {};
-
-	if (!std::holds_alternative<Hash>(it->second.value)) {
-		throw std::runtime_error("WRONGTYPE");
-	}
-
-	auto& h = std::get<Hash>(it->second.value);
-
-	List l;
-	for (const auto& [_, v] : h) l.push_back(v);
-	return l;
-}
-
-std::vector<std::optional<String>> Repository::hmget(const std::string& key, const std::vector<std::string>& fields)
-{
-	auto it = m_data.find(key);
-	if (it == m_data.end()) return {};
-
-	if (!std::holds_alternative<Hash>(it->second.value)) {
-		throw std::runtime_error("WRONGTYPE");
-	}
-
-	std::vector<std::optional<String>> results;
-
-	auto& h = std::get<Hash>(it->second.value);
-	for (const auto& f : fields) {
-		auto e_it = h.find(f);
-		if (e_it != h.end())
-			results.push_back(e_it->second);
-		else
-			results.push_back(std::nullopt);
-	}
-
-	return results;
-}
-
-void Repository::dropExpiration(const std::chrono::steady_clock::time_point& tp, const std::string& key)
-{
-	auto range = m_expiringKeys.equal_range(tp);
-	for (auto it = range.first; it != range.second; ++it) {
-		if (it->second == key) {
-			m_expiringKeys.erase(it);
-			break;
-		}
-	}
-}
-
-bool Repository::isExpired(const std::optional<std::chrono::steady_clock::time_point>& tp)
-{
-	if (!tp.has_value()) return false;
-	auto now = std::chrono::steady_clock::now();
-	return now >= tp;
 }

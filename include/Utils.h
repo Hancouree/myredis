@@ -16,6 +16,7 @@ namespace Utils {
 		std::string ok();
 		std::string error(const std::string& msg);
 		std::string pong();
+		std::string simple(const std::string& str);
 	}
 
 	bool matches(const std::string& key, const std::string& pattern);

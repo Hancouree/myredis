@@ -59,6 +59,10 @@ namespace Utils {
         {
             return "+PONG\r\n";
         }
+
+        std::string simple(const std::string& str) {
+            return "+" + str + "\r\n";
+        }
     }
 
     bool matches(const std::string& key, const std::string& pattern) {

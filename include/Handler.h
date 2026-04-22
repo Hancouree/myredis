@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include "ServerContext.h"
+#include "../include/Utils.h"
 
 class Handler {
 public:
@@ -9,6 +10,12 @@ public:
         const std::vector<std::string>& args, 
         std::shared_ptr<ServerContext>& serverCtx
     ) = 0;
+protected:
+    template <typename Fn>
+    std::string tryExecute(Fn&& func) {
+        try { return func(); }
+        catch (const std::exception& e) { return Utils::Resp::error(e.what()); }
+    }
 };
 
 class PingHandler : public Handler {
