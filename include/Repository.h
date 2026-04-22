@@ -30,6 +30,12 @@ public:
 	int append(const std::string& key, const std::string& value);
 	int strlen(const std::string& key);
 	std::vector<std::optional<String>> mget(const std::vector<std::string>& keys);
+	int exists(const std::vector<std::string>& key);
+	int ttl(const std::string& key);
+	bool persist(const std::string& key);
+	void rename(const std::string& key, const std::string& newKey);
+	List keys(const std::string& pattern);
+	
 	size_t getMemoryUsed();
 	size_t count() const;
 
@@ -56,6 +62,9 @@ public:
 	List hvals(const std::string& key);
 	std::vector<std::optional<String>> hmget(const std::string& key, const std::vector<std::string>& fields);
 private:
+	void dropExpiration(const std::chrono::steady_clock::time_point& tp, const std::string& key);
+	bool isExpired(const std::optional<std::chrono::steady_clock::time_point>& tp);
+
 	std::unordered_map<std::string, Record> m_data;
 	std::multimap<std::chrono::steady_clock::time_point, std::string> m_expiringKeys;
 	bool m_isCacheDirty = true;

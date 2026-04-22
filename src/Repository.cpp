@@ -1,4 +1,5 @@
 #include "../include/Repository.h"
+#include "../include/Utils.h"
 
 void Repository::performCleanup()
 {
@@ -14,14 +15,7 @@ void Repository::set(const std::string& key, const std::string& value)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
 		if (it->second.expires_at.has_value()) {
-			auto range = m_expiringKeys.equal_range(it->second.expires_at.value());
-			
-			for (auto e_it = range.first; e_it != range.second; ++e_it) {
-				if (e_it->second == key) {
-					m_expiringKeys.erase(e_it);
-					break;
-				}
-			}
+			dropExpiration(it->second.expires_at.value(), key);
 		}
 	}
 
@@ -45,24 +39,15 @@ bool Repository::expires(const std::string& key, int seconds)
 const RecordValue* Repository::get(const std::string& key)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
-		auto now = std::chrono::steady_clock::now();
-
-		if (it->second.expires_at.has_value()) {
-			if (now >= it->second.expires_at) {
-				auto range = m_expiringKeys.equal_range(it->second.expires_at.value());
-				for (auto e_it = range.first; e_it != range.second; ++e_it) {
-					if (e_it->second == key) {
-						m_expiringKeys.erase(e_it);
-						break;
-					}
-				}
-
-				m_data.erase(it);
-				return nullptr;
-			}
+		if (isExpired(it->second.expires_at)) {
+			dropExpiration(it->second.expires_at.value(), key);
+			m_data.erase(it);
+			return nullptr;
 		}
+
 		return &it->second.value;
 	}
+
 	return nullptr;
 }
 
@@ -70,14 +55,7 @@ bool Repository::del(const std::string& key)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
 		if (it->second.expires_at.has_value()) {
-			auto range = m_expiringKeys.equal_range(it->second.expires_at.value());
-
-			for (auto e_it = range.first; e_it != range.second; ++e_it) {
-				if (e_it->second == key) {
-					m_expiringKeys.erase(e_it);
-					break;
-				}
-			}
+			dropExpiration(it->second.expires_at.value(), key);
 		}
 
 		m_data.erase(it);
@@ -174,6 +152,86 @@ std::vector<std::optional<String>> Repository::mget(const std::vector<std::strin
 	return out;
 }
 
+int Repository::exists(const std::vector<std::string>& keys)
+{
+	int count = 0;
+	for (const auto& k : keys) {
+		if (auto it = m_data.find(k); it != m_data.end()) {
+			if (isExpired(it->second.expires_at))
+				continue;
+
+			++count;
+		}
+	}
+
+	return count;
+}
+
+int Repository::ttl(const std::string& key)
+{
+	auto it = m_data.find(key);
+	if (it == m_data.end()) return -2;
+	if (!it->second.expires_at.has_value()) return -1;
+
+	auto now = std::chrono::steady_clock::now();
+	auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+		it->second.expires_at.value() - now
+	).count();
+	return elapsed;
+}
+
+bool Repository::persist(const std::string& key)
+{
+	auto it = m_data.find(key);
+	if (it == m_data.end()) return false;
+	if (!it->second.expires_at.has_value()) return false;
+	
+	dropExpiration(it->second.expires_at.value(), key);
+	it->second.expires_at = std::nullopt;
+
+	return true;
+}
+
+void Repository::rename(const std::string& key, const std::string& newKey)
+{
+	auto it = m_data.find(key);
+	if (it == m_data.end()) {
+		throw std::runtime_error("no such key");
+	}
+
+	if (auto e_it = m_data.find(newKey); e_it != m_data.end()) {
+		if (e_it->second.expires_at.has_value()) {
+			dropExpiration(e_it->second.expires_at.value(), newKey);
+		}
+		m_data.erase(e_it);
+	}
+
+	RecordValue value = std::move(it->second.value);
+	auto expires_at = it->second.expires_at;
+
+	m_data.erase(it);
+	if (expires_at.has_value()) {
+		dropExpiration(expires_at.value(), key);
+		m_expiringKeys.insert({ expires_at.value(), newKey });
+	}
+
+	m_data[newKey] = { std::move(value), expires_at };
+	m_isCacheDirty = true;
+}
+
+List Repository::keys(const std::string& pattern)
+{
+	auto now = std::chrono::steady_clock::now();
+	List l;
+	for (auto it = m_data.begin(); it != m_data.end(); ++it) {
+		if (Utils::matches(it->first, pattern)) {
+			if (!isExpired(it->second.expires_at)) l.push_back(it->first);
+		}
+	}
+
+	return l;
+}
+
 size_t Repository::getMemoryUsed()
 {
 	if (m_isCacheDirty) {
@@ -208,7 +266,6 @@ size_t Repository::count() const
 {
 	return m_data.size();
 }
-
 
 int Repository::lpush(const std::string& key, const std::string& value)
 {
@@ -566,4 +623,22 @@ std::vector<std::optional<String>> Repository::hmget(const std::string& key, con
 	}
 
 	return results;
+}
+
+void Repository::dropExpiration(const std::chrono::steady_clock::time_point& tp, const std::string& key)
+{
+	auto range = m_expiringKeys.equal_range(tp);
+	for (auto it = range.first; it != range.second; ++it) {
+		if (it->second == key) {
+			m_expiringKeys.erase(it);
+			break;
+		}
+	}
+}
+
+bool Repository::isExpired(const std::optional<std::chrono::steady_clock::time_point>& tp)
+{
+	if (!tp.has_value()) return false;
+	auto now = std::chrono::steady_clock::now();
+	return now >= tp;
 }

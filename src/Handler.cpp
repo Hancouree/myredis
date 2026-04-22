@@ -6,65 +6,65 @@
 
 std::string PingHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
-    return Utils::pong();
+    return Utils::Resp::pong();
 }
 
 std::string SetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for SET");
+        return Utils::Resp::error("wrong number of arguments for SET");
     }
 
     serverCtx->m_repo->set(args[1], args[2]);
-    return Utils::ok();
+    return Utils::Resp::ok();
 }
 
 std::string GetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for GET");
+        return Utils::Resp::error("wrong number of arguments for GET");
     }
 
     const RecordValue* val = serverCtx->m_repo->get(args[1]);
-    if (!val) return Utils::nil();
+    if (!val) return Utils::Resp::nil();
 
     if (auto* s = std::get_if<String>(val)) {
-        return Utils::bulk(*s);
+        return Utils::Resp::bulk(*s);
     }
     else if (auto* l = std::get_if<List>(val)) {
-        return Utils::list(*l);
+        return Utils::Resp::list(*l);
     }
     else if (auto* h = std::get_if<Hash>(val)) {
-        return Utils::hash(*h);
+        return Utils::Resp::hash(*h);
     }
 
-    return Utils::error("internal error");
+    return Utils::Resp::error("internal error");
 }
 
 std::string ExpireHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for EXPIRE");
+        return Utils::Resp::error("wrong number of arguments for EXPIRE");
     }
 
     try
     {
         int seconds = std::stoi(args[2]);
-        return serverCtx->m_repo->expires(args[1], seconds) ? Utils::integer(1) : Utils::integer(0);
+        return serverCtx->m_repo->expires(args[1], seconds) ? Utils::Resp::integer(1) : Utils::Resp::integer(0);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string DelHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for DEL");
+        return Utils::Resp::error("wrong number of arguments for DEL");
     }
 
-    return serverCtx->m_repo->del(args[1]) ? Utils::integer(1) : Utils::integer(0);
+    return serverCtx->m_repo->del(args[1]) ? Utils::Resp::integer(1) : Utils::Resp::integer(0);
 }
 
 std::string InfoHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
@@ -81,248 +81,314 @@ std::string InfoHandler::execute(const std::vector<std::string>& args, std::shar
     ss << "keys_count:" << serverCtx->m_repo->count() << "\r\n\r\n";
     ss << "total_connections_received:" << serverCtx->getAllConnections() << "\r\n";
     ss << "total_commands_processed:" << serverCtx->getAllProcessedCommands() << "\r\n";
-    return Utils::bulk(ss.str());
+    return Utils::Resp::bulk(ss.str());
 }
 
 std::string IncrHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for INCR");
+        return Utils::Resp::error("wrong number of arguments for INCR");
     }
 
     try
     {
-        return Utils::integer(serverCtx->m_repo->incrBy(args[1]));
+        return Utils::Resp::integer(serverCtx->m_repo->incrBy(args[1]));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string IncrByHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for INCRBY");
+        return Utils::Resp::error("wrong number of arguments for INCRBY");
     }
 
     try
     {
-        return Utils::integer(serverCtx->m_repo->incrBy(args[1], std::stoi(args[2])));
+        return Utils::Resp::integer(serverCtx->m_repo->incrBy(args[1], std::stoi(args[2])));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string DecrHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for DECR");
+        return Utils::Resp::error("wrong number of arguments for DECR");
     }
 
     try
     {
-        return Utils::integer(serverCtx->m_repo->decrBy(args[1]));
+        return Utils::Resp::integer(serverCtx->m_repo->decrBy(args[1]));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string DecrByHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for DECRBY");
+        return Utils::Resp::error("wrong number of arguments for DECRBY");
     }
 
     try
     {
-        return Utils::integer(serverCtx->m_repo->decrBy(args[1], std::stoi(args[2])));
+        return Utils::Resp::integer(serverCtx->m_repo->decrBy(args[1], std::stoi(args[2])));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string StrlenHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for STRLEN");
+        return Utils::Resp::error("wrong number of arguments for STRLEN");
     }
 
     try
     {
-        return Utils::integer(serverCtx->m_repo->strlen(args[1]));
+        return Utils::Resp::integer(serverCtx->m_repo->strlen(args[1]));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string AppendHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for APPEND");
+        return Utils::Resp::error("wrong number of arguments for APPEND");
     }
 
     try
     {
-        return Utils::integer(serverCtx->m_repo->append(args[1], args[2]));
+        return Utils::Resp::integer(serverCtx->m_repo->append(args[1], args[2]));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string MGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for MGET");
+        return Utils::Resp::error("wrong number of arguments for MGET");
+    }
+
+    std::vector<std::optional<String>> results = serverCtx->m_repo->mget({ args.begin() + 1, args.end() });
+    std::string out = "*" + std::to_string(results.size()) + "\r\n";
+    for (const auto& r : results) out += Utils::Resp::nullableBulk(r);
+    return out;
+}
+
+std::string ExistsHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::Resp::error("wrong number of arguments for EXISTS");
+    }
+
+    return Utils::Resp::integer(serverCtx->m_repo->exists({ args.begin() + 1, args.end() }));
+}
+
+std::string TypeHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::Resp::error("wrong number of arguments for TYPE");
+    }
+
+    const RecordValue* v = serverCtx->m_repo->get(args[1]);
+    if (!v) return Utils::Resp::bulk("none");
+    return std::visit([](auto&& arg) -> std::string {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, String>) return Utils::Resp::bulk("string");
+        else if constexpr (std::is_same_v<T, List>) return Utils::Resp::bulk("list");
+        else if constexpr (std::is_same_v<T, Hash>) return Utils::Resp::bulk("hash");
+        else return Utils::Resp::error("internal error");
+    }, *v);
+}
+
+std::string TtlHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::Resp::error("wrong number of arguments for TTL");
+    }
+
+    return Utils::Resp::integer(serverCtx->m_repo->ttl(args[1]));
+}
+
+std::string PersistHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::Resp::error("wrong number of arguments for PERSIST");
+    }
+
+    return Utils::Resp::integer(serverCtx->m_repo->persist(args[1]) ? 1 : 0);
+}
+
+std::string RenameHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 3) {
+        return Utils::Resp::error("wrong number of arguments for RENAME");
     }
 
     try
     {
-        std::vector<std::optional<String>> results = serverCtx->m_repo->mget({ args.begin() + 1, args.end() });
-        std::string out = "*" + std::to_string(results.size()) + "\r\n";
-        for (const auto& r : results) out += Utils::nullableBulk(r);
-        return out;
+        serverCtx->m_repo->rename(args[1], args[2]);
+        return Utils::Resp::ok();
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
+
+std::string KeysHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) {
+        return Utils::Resp::error("wrong number of arguments for KEYS");
+    }
+
+    List l = serverCtx->m_repo->keys(args[1]);
+    return Utils::Resp::list(l);
+}
+
+// LIST
 
 std::string LPushHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for LPUSH");
+        return Utils::Resp::error("wrong number of arguments for LPUSH");
     }
 
     try
     {
         int size = serverCtx->m_repo->lpush(args[1], args[2]);
-        return Utils::integer(size);
+        return Utils::Resp::integer(size);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string RPushHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for RPUSH");
+        return Utils::Resp::error("wrong number of arguments for RPUSH");
     }
 
     try
     {
         int size = serverCtx->m_repo->rpush(args[1], args[2]);
-        return Utils::integer(size);
+        return Utils::Resp::integer(size);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string LPopHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx) {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for LPOP");
+        return Utils::Resp::error("wrong number of arguments for LPOP");
     }
 
     try
     {
         std::optional<String> val = serverCtx->m_repo->lpop(args[1]);
-        if (!val.has_value()) return Utils::nil();
-        return Utils::bulk(val.value());
+        if (!val.has_value()) return Utils::Resp::nil();
+        return Utils::Resp::bulk(val.value());
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string RPopHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for RPOP");
+        return Utils::Resp::error("wrong number of arguments for RPOP");
     }
 
     try
     {
         std::optional<String> val = serverCtx->m_repo->rpop(args[1]);
-        if (!val.has_value()) return Utils::nil();
-        return Utils::bulk(val.value());
+        if (!val.has_value()) return Utils::Resp::nil();
+        return Utils::Resp::bulk(val.value());
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string LLenHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for LLEN");
+        return Utils::Resp::error("wrong number of arguments for LLEN");
     }
 
     try
     {
-        return Utils::integer(serverCtx->m_repo->llen(args[1]));
+        return Utils::Resp::integer(serverCtx->m_repo->llen(args[1]));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string LIndexHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for LINDEX");
+        return Utils::Resp::error("wrong number of arguments for LINDEX");
     }
 
     try
     {
         std::optional<std::string> val = serverCtx->m_repo->lindex(args[1], std::stoi(args[2]));
-        if (!val.has_value()) return Utils::nil();
-        return Utils::bulk(val.value());
+        if (!val.has_value()) return Utils::Resp::nil();
+        return Utils::Resp::bulk(val.value());
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string LRangeHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 4) {
-        return Utils::error("wrong number of arguments for LRANGE");
+        return Utils::Resp::error("wrong number of arguments for LRANGE");
     }
 
     try
     {
         const List& l = serverCtx->m_repo->lrange(args[1], std::stoi(args[2]), std::stoi(args[3]));
-        return Utils::list(l);
+        return Utils::Resp::list(l);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string LInsertHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 5) {
-        return Utils::error("wrong number of arguments for LINSERT");
+        return Utils::Resp::error("wrong number of arguments for LINSERT");
     }
 
     try
@@ -330,199 +396,201 @@ std::string LInsertHandler::execute(const std::vector<std::string>& args, std::s
         std::string where = args[2];
         std::transform(where.begin(), where.end(), where.begin(), ::toupper);
         if (where != "BEFORE" && where != "AFTER") {
-            return Utils::error("syntax error");
+            return Utils::Resp::error("syntax error");
         }
 
         int size = serverCtx->m_repo->linsert(args[1], where, args[3], args[4]);
-        return Utils::integer(size);
+        return Utils::Resp::integer(size);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string LSetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 4) {
-        return Utils::error("wrong number of arguments for LSET");
+        return Utils::Resp::error("wrong number of arguments for LSET");
     }
 
     try
     {
         serverCtx->m_repo->lset(args[1], std::stoi(args[2]), args[3]);
-        return Utils::ok();
+        return Utils::Resp::ok();
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string LTrimHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 4) {
-        return Utils::error("wrong number of arguments for LTRIM");
+        return Utils::Resp::error("wrong number of arguments for LTRIM");
     }
 
     try
     {
         serverCtx->m_repo->ltrim(args[1], std::stoi(args[2]), std::stoi(args[3]));
-        return Utils::ok();
+        return Utils::Resp::ok();
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
+
+// HASH
 
 std::string HSetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 4) {
-        return Utils::error("wrong number of arguments for HSET");
+        return Utils::Resp::error("wrong number of arguments for HSET");
     }
 
     try
     {
         int size = serverCtx->m_repo->hset(args[1], args[2], args[3]);
-        return Utils::integer(size);
+        return Utils::Resp::integer(size);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string HGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for HGET");
+        return Utils::Resp::error("wrong number of arguments for HGET");
     }
 
     try
     {
         std::optional<String> r = serverCtx->m_repo->hget(args[1], args[2]);
-        return Utils::nullableBulk(r);
+        return Utils::Resp::nullableBulk(r);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string HGetAllHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for HGETALL");
+        return Utils::Resp::error("wrong number of arguments for HGETALL");
     }
 
     try
     {
         const Hash* h = serverCtx->m_repo->hgetall(args[1]);
-        if (!h) return Utils::emptyArr();
-        return Utils::hash(*h);
+        if (!h) return Utils::Resp::emptyArr();
+        return Utils::Resp::hash(*h);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string HDelHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for HDEL");
+        return Utils::Resp::error("wrong number of arguments for HDEL");
     }
 
     try
     {
-        return serverCtx->m_repo->hdel(args[1], args[2]) ? Utils::integer(1) : Utils::integer(0);
+        return serverCtx->m_repo->hdel(args[1], args[2]) ? Utils::Resp::integer(1) : Utils::Resp::integer(0);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string HExistsHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for HEXISTS");
+        return Utils::Resp::error("wrong number of arguments for HEXISTS");
     }
 
     try
     {
-        return serverCtx->m_repo->hexists(args[1], args[2]) ? Utils::integer(1) : Utils::integer(0);
+        return serverCtx->m_repo->hexists(args[1], args[2]) ? Utils::Resp::integer(1) : Utils::Resp::integer(0);
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string HLenHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for HLEN");
+        return Utils::Resp::error("wrong number of arguments for HLEN");
     }
 
     try
     {
-        return Utils::integer(serverCtx->m_repo->hlen(args[1]));
+        return Utils::Resp::integer(serverCtx->m_repo->hlen(args[1]));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string HKeysHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for HKEYS");
+        return Utils::Resp::error("wrong number of arguments for HKEYS");
     }
 
     try
     {
-        return Utils::list(serverCtx->m_repo->hkeys(args[1]));
+        return Utils::Resp::list(serverCtx->m_repo->hkeys(args[1]));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string HValsHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) {
-        return Utils::error("wrong number of arguments for HVALS");
+        return Utils::Resp::error("wrong number of arguments for HVALS");
     }
 
     try
     {
-        return Utils::list(serverCtx->m_repo->hvals(args[1]));
+        return Utils::Resp::list(serverCtx->m_repo->hvals(args[1]));
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }
 
 std::string HMGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) {
-        return Utils::error("wrong number of arguments for HMGET");
+        return Utils::Resp::error("wrong number of arguments for HMGET");
     }
 
     try
     {
         std::vector<std::optional<std::string>> results = serverCtx->m_repo->hmget(args[1], { args.begin() + 2, args.end() });
         std::string out = "*" + std::to_string(results.size()) + "\r\n";
-        for (const auto& r : results) out += Utils::nullableBulk(r);
+        for (const auto& r : results) out += Utils::Resp::nullableBulk(r);
         return out;
     }
     catch (const std::exception& e)
     {
-        return Utils::error(e.what());
+        return Utils::Resp::error(e.what());
     }
 }

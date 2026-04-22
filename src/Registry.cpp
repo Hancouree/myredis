@@ -18,6 +18,12 @@ void Registry::init()
     m_handlers["APPEND"] = std::make_shared<AppendHandler>();
     m_handlers["STRLEN"] = std::make_shared<StrlenHandler>();
     m_handlers["MGET"] = std::make_shared<MGetHandler>();
+    m_handlers["EXISTS"] = std::make_shared<ExistsHandler>();
+    m_handlers["TYPE"] = std::make_shared<TypeHandler>();
+    m_handlers["TTL"] = std::make_shared<TtlHandler>();
+    m_handlers["PERSIST"] = std::make_shared<PersistHandler>();
+    m_handlers["RENAME"] = std::make_shared<RenameHandler>();
+    m_handlers["KEYS"] = std::make_shared<KeysHandler>();
 
     m_handlers["LPUSH"] = std::make_shared<LPushHandler>();
     m_handlers["RPUSH"] = std::make_shared<RPushHandler>();

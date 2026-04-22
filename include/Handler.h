@@ -115,6 +115,55 @@ public:
     ) override;
 };
 
+class ExistsHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class TypeHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class TtlHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class PersistHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class RenameHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+class KeysHandler : public Handler {
+public:
+    std::string execute(
+        const std::vector<std::string>& args,
+        std::shared_ptr<ServerContext>& serverCtx
+    ) override;
+};
+
+
 class LPushHandler : public Handler {
 public:
     std::string execute(
