@@ -12,7 +12,34 @@ Session::Session(tcp::socket s, std::shared_ptr<ServerContext> serverCtx)
 
 Session::~Session()
 {
+    for (const auto& pattern : m_subscribedPatterns) {
+        m_serverCtx->m_pubSubRepo->punsubscribe(pattern, this);
+    }
+    for (const auto& channel : m_subscribedChannels) {
+        m_serverCtx->m_pubSubRepo->unsubscribe(channel, this);
+    }
+
     m_serverCtx->decrementConnections();
+}
+
+void Session::addChannel(const std::string& channel)
+{
+    m_subscribedChannels.insert(channel);
+}
+
+void Session::addPattern(const std::string& pattern)
+{
+    m_subscribedPatterns.insert(pattern);
+}
+
+void Session::removeChannel(const std::string& channel)
+{
+    m_subscribedChannels.erase(channel);
+}
+
+void Session::removePattern(const std::string& pattern)
+{
+    m_subscribedPatterns.erase(pattern);
 }
 
 void Session::doRead()
@@ -80,9 +107,14 @@ std::string Session::handleCommand(std::vector<std::string>& args)
     std::string cmd = args[0];
     std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
 
-    return Registry::handle(
-        cmd,
-        args,
-        m_serverCtx
-    );
+    if (isSubscribed()) {
+        if (cmd != "SUBSCRIBE" && cmd != "UNSUBSCRIBE" &&
+            cmd != "PSUBSCRIBE" && cmd != "PUNSUBSCRIBE" &&
+            cmd != "PING" && cmd != "QUIT")
+        {
+            return "-ERR only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT allowed in this context\r\n";
+        }
+    }
+
+    return Registry::handle(cmd, args, m_serverCtx, this);
 }

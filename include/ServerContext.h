@@ -1,10 +1,15 @@
 #pragma once
 #include <memory>
+#include <unordered_set>
 #include "Repository.h"
+#include "PubSubRepository.h"
+
+class Session;
 
 class ServerContext {
 public:
     std::shared_ptr<Repository> m_repo;
+    std::shared_ptr<PubSubRepository> m_pubSubRepo;
 
     ServerContext();
 
