@@ -1,7 +1,9 @@
 #include "../include/Registry.h"
 #include "../include/Handler.h"
+#include "../include/SessionHandler.h"
 
 std::unordered_map<std::string, std::shared_ptr<Handler>> Registry::m_handlers;
+std::unordered_map<std::string, std::shared_ptr<SessionHandler>> Registry::m_sessionHandlers;
 
 void Registry::init()
 {
@@ -45,16 +47,27 @@ void Registry::init()
     m_handlers["HKEYS"] = std::make_shared<HKeysHandler>();
     m_handlers["HVALS"] = std::make_shared<HValsHandler>();
     m_handlers["HMGET"] = std::make_shared<HMGetHandler>();
+
+    //SESSION HANDLERS
+    m_sessionHandlers["SUBSCRIBE"] = std::make_shared<SubscribeHandler>();
+    m_sessionHandlers["UNSUBSCRIBE"] = std::make_shared<UnsubscribeHandler>();
+    m_sessionHandlers["PUBLISH"] = std::make_shared<PublishHandler>();
+    m_sessionHandlers["PSUBSCRIBE"] = std::make_shared<PSubscribeHandler>();
 }
 
 std::string Registry::handle(
     const std::string& cmd, 
     const std::vector<std::string>& args, 
-    std::shared_ptr<ServerContext>& serverCtx
+    std::shared_ptr<ServerContext>& serverCtx,
+    Session* session
 ) {
+    if (auto it = m_sessionHandlers.find(cmd); it != m_sessionHandlers.end()) {
+        return it->second->execute(args, serverCtx, session);
+    }
+
     if (auto it = m_handlers.find(cmd); it != m_handlers.end()) {
         return it->second->execute(args, serverCtx);
     }
 
-    return "-ERR unknown command\r\n";;
+    return "-ERR unknown command\r\n";
 }

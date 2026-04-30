@@ -134,10 +134,12 @@
     <ClCompile Include="src\Handler.cpp" />
     <ClCompile Include="src\Listener.cpp" />
     <ClCompile Include="src\Parser.cpp" />
+    <ClCompile Include="src\PubSubRepository.cpp" />
     <ClCompile Include="src\Registry.cpp" />
     <ClCompile Include="src\Repository.cpp" />
     <ClCompile Include="src\ServerContext.cpp" />
     <ClCompile Include="src\Session.cpp" />
+    <ClCompile Include="src\SessionHandler.cpp" />
     <ClCompile Include="src\Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -145,10 +147,12 @@
     <ClInclude Include="include\Handler.h" />
     <ClInclude Include="include\Listener.h" />
     <ClInclude Include="include\Parser.h" />
+    <ClInclude Include="include\PubSubRepository.h" />
     <ClInclude Include="include\Registry.h" />
     <ClInclude Include="include\Repository.h" />
     <ClInclude Include="include\ServerContext.h" />
     <ClInclude Include="include\Session.h" />
+    <ClInclude Include="include\SessionHandler.h" />
     <ClInclude Include="include\Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

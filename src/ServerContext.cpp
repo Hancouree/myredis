@@ -1,10 +1,13 @@
 #include "../include/ServerContext.h"
+#include "../include/Session.h"
+#include "../include/Utils.h"
 
 ServerContext::ServerContext()
     : m_activeConnections(0)
     , m_allConnections(0)
     , m_processedCommands(0)
     , m_repo(std::make_shared<Repository>())
+    , m_pubSubRepo(std::make_shared<PubSubRepository>())
     , m_startTime(std::chrono::steady_clock::now())
 {
 }
