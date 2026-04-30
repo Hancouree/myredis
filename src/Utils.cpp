@@ -133,19 +133,10 @@ namespace Utils {
         delRecursive(root.get(), pattern, session);
     }
 
-    std::vector<Session*> PatternTree::findMatches(const std::string& channel) {
+    std::set<Match> PatternTree::findMatches(const std::string& channel) {
         if (channel.empty()) return {};
-
-        std::vector<Session*> result;
-        result.reserve(16);
-
+        std::set<Match> result;
         collectMatches(root.get(), channel, 0, result);
-
-        if (result.size() > 1) {
-            std::sort(result.begin(), result.end());
-            result.erase(std::unique(result.begin(), result.end()), result.end());
-        }
-
         return result;
     }
 
@@ -163,9 +154,7 @@ namespace Utils {
         if (current.empty()) {
             node->isEnd = true;
             node->fullPattern = fullPattern;
-            if (std::find(node->subscribers.begin(), node->subscribers.end(), session) == node->subscribers.end()) {
-                node->subscribers.push_back(session);
-            }
+            node->subscribers.insert(session);
 
             return;
         }
@@ -175,7 +164,7 @@ namespace Utils {
         if (!node->children.contains(firstChar)) {
             auto newNode = std::make_unique<PatternNode>(current, fullPattern);
             newNode->isEnd = true;
-            newNode->subscribers.push_back(session);
+            newNode->subscribers.insert(session);
             node->children[firstChar] = std::move(newNode);
             return;
         }
@@ -200,13 +189,13 @@ namespace Utils {
         if (!currentRemaining.empty()) {
             auto newLeaf = std::make_unique<PatternNode>(currentRemaining, fullPattern);
             newLeaf->isEnd = true;
-            newLeaf->subscribers.push_back(session);
+            newLeaf->subscribers.insert(session);
             splitNode->children[currentRemaining[0]] = std::move(newLeaf);
         }
         else {
             splitNode->isEnd = true;
             splitNode->fullPattern = fullPattern;
-            splitNode->subscribers.push_back(session);
+            splitNode->subscribers.insert(session);
         }
 
         node->children[firstChar] = std::move(splitNode);
@@ -217,10 +206,7 @@ namespace Utils {
         if (current.empty()) {
             if (!node->isEnd) return false;
 
-            auto it = std::find(node->subscribers.begin(), node->subscribers.end(), session);
-            if (it != node->subscribers.end()) {
-                node->subscribers.erase(it);
-            }
+            node->subscribers.erase(session);
 
             if (!node->subscribers.empty()) return false;
             node->isEnd = false;
@@ -260,10 +246,12 @@ namespace Utils {
         return false;
     }
 
-    void PatternTree::collectMatches(PatternNode* node, const std::string& channel, size_t pos, std::vector<Session*>& psubscribers) {
+    void PatternTree::collectMatches(PatternNode* node, const std::string& channel, size_t pos, std::set<Match>& psubscribers) {
         if (node->isEnd) {
             if (matches(channel, node->fullPattern)) {
-                psubscribers.insert(psubscribers.end(), node->subscribers.begin(), node->subscribers.end());
+                for (const auto& psub : node->subscribers) {
+                    psubscribers.insert({ node->fullPattern, psub });
+                }
             }
         }
 
