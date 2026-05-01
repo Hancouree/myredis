@@ -47,12 +47,28 @@ void PubSubRepository::punsubscribe(const std::string& pattern, Session* session
     m_patternSubscribers.del(pattern, session);
 }
 
-List PubSubRepository::pubsub(std::string pattern)
+List PubSubRepository::channels(std::string pattern)
 {
     List out;
     for (const auto& [channel, subs] : m_subscribers) {
         if (pattern.empty() || Utils::matches(channel, pattern)) {
             out.push_back(channel);
+        }
+    }
+
+    return out;
+}
+
+Hash PubSubRepository::numsub(const std::vector<std::string>& channels)
+{
+    Hash out;
+    for (const auto& channel : channels) {
+        auto it = m_subscribers.find(channel);
+        if (it == m_subscribers.end()) {
+            out.insert({ channel, "0" });
+        }
+        else {
+            out.insert({ channel, std::to_string(it->second.size()) });
         }
     }
 

@@ -160,9 +160,15 @@ std::string PubSubChannelsHandler::execute(
 
     std::string subCommand = args[1];
     std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::toupper);
-    if (subCommand != "CHANNELS") {
-        return Utils::Resp::error("unknown command");
+    if (subCommand == "CHANNELS") {
+        return Utils::Resp::list(serverCtx->m_pubSubRepo->channels(args.size() < 3 ? "" : args[2]));
+    }
+    else if (subCommand == "NUMSUB") {
+        return Utils::Resp::hash(serverCtx->m_pubSubRepo->numsub({ args.begin() + 2, args.end() }));
+    }
+    else if (subCommand == "NUMPAT") {
+        return Utils::Resp::integer(serverCtx->m_pubSubRepo->numpat());
     }
 
-    return Utils::Resp::list(serverCtx->m_pubSubRepo->pubsub(args.size() < 3 ? "" : args[2]));
+    return Utils::Resp::error("unknown command");
 }
