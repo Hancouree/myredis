@@ -47,6 +47,7 @@ namespace Utils {
 		PatternTree();
 		void add(const std::string& pattern, Session* session);
 		void del(const std::string& pattern, Session* session);
+		int size() const { return m_size; }
 		std::set<Match> findMatches(const std::string& channel);
 	private:
 		int commonPrefix(const std::string& a, const std::string& b);
@@ -55,5 +56,6 @@ namespace Utils {
 		void collectMatches(PatternNode* node, const std::string& channel, size_t pos, std::set<Match>& psubscribers);
 
 		std::unique_ptr<PatternNode> root;
+		int m_size;
 	};
 }

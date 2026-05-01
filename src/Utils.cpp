@@ -120,7 +120,10 @@ namespace Utils {
         }
     }
 
-    PatternTree::PatternTree() : root(std::make_unique<PatternNode>()) {}
+    PatternTree::PatternTree() 
+        : root(std::make_unique<PatternNode>()) 
+        , m_size(0)
+    {}
 
     void PatternTree::add(const std::string& pattern, Session* session) {
         if (pattern.empty() || !session) return;
@@ -166,6 +169,7 @@ namespace Utils {
             newNode->isEnd = true;
             newNode->subscribers.insert(session);
             node->children[firstChar] = std::move(newNode);
+            ++m_size;
             return;
         }
 
@@ -199,6 +203,7 @@ namespace Utils {
         }
 
         node->children[firstChar] = std::move(splitNode);
+        ++m_size;
     }
 
     bool PatternTree::delRecursive(PatternNode* node, const std::string& current, Session* session)
@@ -226,6 +231,7 @@ namespace Utils {
 
         if (shouldDeleteChild) {
             node->children.erase(firstChar);
+            --m_size;
 
             if (node->children.size() == 1 && !node->isEnd && node != root.get()) {
                 auto itNext = node->children.begin();

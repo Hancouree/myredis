@@ -74,3 +74,8 @@ Hash PubSubRepository::numsub(const std::vector<std::string>& channels)
 
     return out;
 }
+
+int PubSubRepository::numpat()
+{
+    return m_patternSubscribers.size();
+}

@@ -53,6 +53,7 @@ void Registry::init()
     m_sessionHandlers["UNSUBSCRIBE"] = std::make_shared<UnsubscribeHandler>();
     m_sessionHandlers["PUBLISH"] = std::make_shared<PublishHandler>();
     m_sessionHandlers["PSUBSCRIBE"] = std::make_shared<PSubscribeHandler>();
+    m_sessionHandlers["PUNSUBSCRIBE"] = std::make_shared<PUnsubscribeHandler>();
     m_sessionHandlers["PUBSUB"] = std::make_shared<PubSubChannelsHandler>();
 }
 
