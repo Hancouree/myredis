@@ -1,5 +1,4 @@
 #include "../include/PubSubRepository.h"
-#include "../include/Session.h"
 
 //
 #include <iostream>
@@ -15,24 +14,23 @@ void PubSubRepository::psubscribe(const std::string& pattern, Session* session)
     m_patternSubscribers.add(pattern, session);
 }
 
-int PubSubRepository::publish(const std::string& channel, const std::string& payload)
+int PubSubRepository::publish(const std::string& channel, const std::string& payload, PublishCallback callback)
 {
-    auto it = m_subscribers.find(channel);
-    if (it == m_subscribers.end()) return 0;
+    int count = 0;
 
-    auto& directReceivers = it->second;
-    std::string message = Utils::Resp::list({ "message", channel, payload });
-    for (const auto& sub : directReceivers) {
-        sub->doWrite(message);
+    if (auto it = m_subscribers.find(channel); it != m_subscribers.end()) {
+        for (auto* sub : it->second)
+            callback(sub, channel, "", payload);
+        count += it->second.size();
     }
 
     auto patternReceivers = m_patternSubscribers.findMatches(channel);
     for (const auto& [pattern, sub] : patternReceivers) {
-        std::string pmessage = Utils::Resp::list({ "pmessage", pattern, payload });
-        sub->doWrite(pmessage);
+        callback(sub, channel, pattern, payload);
     }
-    
-    return directReceivers.size();
+    count += patternReceivers.size();
+
+    return count;
 }
 
 void PubSubRepository::unsubscribe(const std::string& channel, Session* session)

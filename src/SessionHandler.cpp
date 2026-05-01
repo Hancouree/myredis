@@ -20,7 +20,7 @@ std::string SubscribeHandler::execute(
         response += "*3\r\n" +
                     Utils::Resp::bulk("subscribe") +
                     Utils::Resp::bulk(c) +
-                    Utils::Resp::integer(session->subscribedChannels());
+                    Utils::Resp::integer(session->subscribedChannels() + session->subscribedPatterns());
     }
 
     return response;
@@ -36,8 +36,45 @@ std::string PublishHandler::execute(
     }
 
     std::string channel = args[1];
-    int count = serverCtx->m_pubSubRepo->publish(channel, args[2]);
+    int count = serverCtx->m_pubSubRepo->publish(channel, args[2], 
+        [](Session* sub, const std::string& channel, const std::string& pattern, const std::string& payload) {
+            std::string formattedResp;
+            if (pattern.empty()) {
+                formattedResp = Utils::Resp::list({ "message", channel,  payload });
+            }
+            else {
+                formattedResp = Utils::Resp::list({ "pmessage", pattern, channel, payload });
+            }
+
+            sub->doWrite(formattedResp);
+        }
+    );
+
     return Utils::Resp::integer(count);
+}
+
+std::string PSubscribeHandler::execute(
+    const std::vector<std::string>& args, 
+    std::shared_ptr<ServerContext>& serverCtx, 
+    Session* session
+) {
+    if (args.size() < 2) {
+        return Utils::Resp::error("wrong number of arguments for PSUBSCRIBE");
+    }
+
+    std::vector<std::string> patternsToSubscribe = { args.begin() + 1, args.end() };
+    std::string response = "";
+    for (const auto& p : patternsToSubscribe) {
+        serverCtx->m_pubSubRepo->psubscribe(p, session);
+        session->addPattern(p);
+
+        response += "*3\r\n" +
+            Utils::Resp::bulk("psubscribe") +
+            Utils::Resp::bulk(p) +
+            Utils::Resp::integer(session->subscribedChannels() + session->subscribedPatterns());
+    }
+
+    return response;
 }
 
 std::string UnsubscribeHandler::execute(
@@ -61,40 +98,16 @@ std::string UnsubscribeHandler::execute(
         session->removeChannel(channel);
 
         response += "*3\r\n" +
-                    Utils::Resp::bulk("unsubscribe") +
-                    Utils::Resp::bulk(channel) +
-                    Utils::Resp::integer(session->subscribedChannels());
+            Utils::Resp::bulk("unsubscribe") +
+            Utils::Resp::bulk(channel) +
+            Utils::Resp::integer(session->subscribedChannels() + session->subscribedPatterns());
     }
 
     if (response.empty()) {
         response = "*3\r\n" +
-                    Utils::Resp::bulk("unsubscribe") +
-                    Utils::Resp::nil() +
-                    Utils::Resp::integer(0);
-    }
-
-    return response;
-}
-
-std::string PSubscribeHandler::execute(
-    const std::vector<std::string>& args, 
-    std::shared_ptr<ServerContext>& serverCtx, 
-    Session* session
-) {
-    if (args.size() < 2) {
-        return Utils::Resp::error("wrong number of arguments for PSUBSCRIBE");
-    }
-
-    std::vector<std::string> patternsToSubscribe = { args.begin() + 1, args.end() };
-    std::string response = "";
-    for (const auto& p : patternsToSubscribe) {
-        serverCtx->m_pubSubRepo->psubscribe(p, session);
-        session->addPattern(p);
-
-        response += "*3\r\n" +
-            Utils::Resp::bulk("psubscribe") +
-            Utils::Resp::bulk(p) +
-            Utils::Resp::integer(session->subscribedPatterns());
+            Utils::Resp::bulk("unsubscribe") +
+            Utils::Resp::nil() +
+            Utils::Resp::integer(0);
     }
 
     return response;
@@ -123,7 +136,7 @@ std::string PUnsubscribeHandler::execute(
         response += "*3\r\n" +
             Utils::Resp::bulk("punsubscribe") +
             Utils::Resp::bulk(pattern) +
-            Utils::Resp::integer(session->subscribedChannels());
+            Utils::Resp::integer(session->subscribedChannels() + session->subscribedPatterns()); 
     }
 
     if (response.empty()) {

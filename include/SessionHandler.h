@@ -50,3 +50,12 @@ public:
 		Session* session
 	);
 };
+
+class PUnsubscribeHandler : public SessionHandler {
+public:
+	std::string execute(
+		const std::vector<std::string>& args,
+		std::shared_ptr<ServerContext>& serverCtx,
+		Session* session
+	);
+};

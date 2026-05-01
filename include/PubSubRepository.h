@@ -1,17 +1,20 @@
 #pragma once
 #include <string>
 #include <unordered_map>
+#include <functional>
 #include <unordered_set>
 #include "Utils.h"
 
 class Session;
+
+using PublishCallback = std::function<void(Session*, const std::string&, const std::string&, const std::string&)>;
 
 class PubSubRepository
 {
 public:
     void subscribe(const std::string& channel, Session* session);
     void psubscribe(const std::string& pattern, Session* session);
-    int publish(const std::string& channel, const std::string& payload);
+    int publish(const std::string& channel, const std::string& payload, PublishCallback callback);
     void unsubscribe(const std::string& channel, Session* session);
     void punsubscribe(const std::string& pattern, Session* session);
 private:
