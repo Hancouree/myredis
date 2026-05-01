@@ -148,3 +148,21 @@ std::string PUnsubscribeHandler::execute(
 
     return response;
 }
+
+std::string PubSubChannelsHandler::execute(
+    const std::vector<std::string>& args, 
+    std::shared_ptr<ServerContext>& serverCtx, 
+    Session* session
+) { 
+    if (args.size() < 2) {
+        return Utils::Resp::error("wrong number of arguments for PSUBSCRIBE");
+    }
+
+    std::string subCommand = args[1];
+    std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::toupper);
+    if (subCommand != "CHANNELS") {
+        return Utils::Resp::error("unknown command");
+    }
+
+    return Utils::Resp::list(serverCtx->m_pubSubRepo->pubsub(args.size() < 3 ? "" : args[2]));
+}

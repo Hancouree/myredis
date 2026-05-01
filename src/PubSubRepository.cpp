@@ -46,3 +46,15 @@ void PubSubRepository::punsubscribe(const std::string& pattern, Session* session
 {
     m_patternSubscribers.del(pattern, session);
 }
+
+List PubSubRepository::pubsub(std::string pattern)
+{
+    List out;
+    for (const auto& [channel, subs] : m_subscribers) {
+        if (pattern.empty() || Utils::matches(channel, pattern)) {
+            out.push_back(channel);
+        }
+    }
+
+    return out;
+}
