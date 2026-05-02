@@ -51,19 +51,25 @@ const RecordValue* Repository::get(const std::string& key)
 	return nullptr;
 }
 
-bool Repository::del(const std::string& key)
+int Repository::del(const std::vector<std::string>& keys)
 {
-	if (auto it = m_data.find(key); it != m_data.end()) {
+	int count = 0;
+	for (const auto& k : keys) {
+		auto it = m_data.find(k);
+		if (it == m_data.end()) {
+			continue;
+		}
+
 		if (it->second.expires_at.has_value()) {
-			dropExpiration(it->second.expires_at.value(), key);
+			dropExpiration(it->second.expires_at.value(), k);
 		}
 
 		m_data.erase(it);
 		m_isCacheDirty = true;
-		return true;
+		++count;
 	}
 
-	return false;
+	return count;
 }
 
 int Repository::incrBy(const std::string& key, int delta)
@@ -253,7 +259,7 @@ std::optional<String> Repository::lpop(const std::string& key)
 	std::string popped = l->front();
 	l->pop_front();
 	m_isCacheDirty = true;
-	if (l->empty()) del(key);
+	if (l->empty()) del({ key });
 	return popped;
 }
 
@@ -265,7 +271,7 @@ std::optional<String> Repository::rpop(const std::string& key)
 	std::string popped = l->back();
 	l->pop_back();
 	m_isCacheDirty = true;
-	if (l->empty()) del(key);
+	if (l->empty()) del({ key });
 	return popped;
 }
 
@@ -341,7 +347,7 @@ void Repository::ltrim(const std::string& key, int start, int stop)
 
 	start = std::max(start, 0);
 	stop = std::min(stop, (int)l->size() - 1);
-	if (start > stop) { del(key); return; }
+	if (start > stop) { del({ key }); return; }
 
 	*l = List(l->begin() + start, l->begin() + stop + 1);
 }
@@ -379,7 +385,7 @@ bool Repository::hdel(const std::string& key, const std::string& field)
 	bool erased = h->erase(field) > 0;
 	if (erased) {
 		m_isCacheDirty = true;
-		if (h->empty()) del(key);
+		if (h->empty()) del({ key });
 	}
 	return erased;
 }

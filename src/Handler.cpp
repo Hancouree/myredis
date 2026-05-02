@@ -58,7 +58,7 @@ std::string DelHandler::execute(const std::vector<std::string>& args, std::share
         return Utils::Resp::error("wrong number of arguments for DEL");
     }
 
-    return serverCtx->m_repo->del(args[1]) ? Utils::Resp::integer(1) : Utils::Resp::integer(0);
+    return Utils::Resp::integer(serverCtx->m_repo->del({ args.begin() + 1, args.end() }));
 }
 
 std::string InfoHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)

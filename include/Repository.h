@@ -24,7 +24,7 @@ public:
 	void set(const std::string& key, const std::string& value);
 	bool expires(const std::string& key, int seconds);
 	const RecordValue* get(const std::string& key);
-	bool del(const std::string& key);
+	int del(const std::vector<std::string>& keys);
 	int incrBy(const std::string& key, int delta = 1);
 	int append(const std::string& key, const std::string& value);
 	int strlen(const std::string& key);
