@@ -26,18 +26,11 @@ std::string GetHandler::execute(const std::vector<std::string>& args, std::share
 
     const RecordValue* val = serverCtx->m_repo->get(args[1]);
     if (!val) return Utils::Resp::nil();
-
     if (auto* s = std::get_if<String>(val)) {
         return Utils::Resp::bulk(*s);
     }
-    else if (auto* l = std::get_if<List>(val)) {
-        return Utils::Resp::list(*l);
-    }
-    else if (auto* h = std::get_if<Hash>(val)) {
-        return Utils::Resp::hash(*h);
-    }
 
-    return Utils::Resp::error("internal error");
+    return Utils::Resp::error("WRONGTYPE");
 }
 
 std::string ExpireHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
