@@ -155,7 +155,7 @@ std::string PubSubChannelsHandler::execute(
     Session* session
 ) { 
     if (args.size() < 2) {
-        return Utils::Resp::error("wrong number of arguments for PSUBSCRIBE");
+        return Utils::Resp::error("wrong number of arguments for PUBSUB");
     }
 
     std::string subCommand = args[1];
