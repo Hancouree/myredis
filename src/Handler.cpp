@@ -139,7 +139,7 @@ std::string MGetHandler::execute(const std::vector<std::string>& args, std::shar
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for MGET");
     std::vector<const String*> results = serverCtx->m_repo->mget({ args.begin() + 1, args.end() });
     std::string out = "*" + std::to_string(results.size()) + "\r\n";
-    for (const auto* s : results) out += Utils::Resp::nullableBulk(*s);
+    for (const auto* s : results) out += s ? Utils::Resp::bulk(*s) : Utils::Resp::nil();
     return out;
 }
 
