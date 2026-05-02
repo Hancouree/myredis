@@ -134,6 +134,13 @@ std::string AppendHandler::execute(const std::vector<std::string>& args, std::sh
     });
 }
 
+std::string MSetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2 || args.size() % 2 == 0) return Utils::Resp::error("wrong number of arguments for MSET");
+    serverCtx->m_repo->mset({ args.begin() + 1, args.end() });
+    return Utils::Resp::ok();
+}
+
 std::string MGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for MGET");

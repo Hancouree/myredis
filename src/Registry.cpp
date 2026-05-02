@@ -19,6 +19,7 @@ void Registry::init()
     m_handlers["DECRBY"] = std::make_shared<DecrByHandler>();
     m_handlers["APPEND"] = std::make_shared<AppendHandler>();
     m_handlers["STRLEN"] = std::make_shared<StrlenHandler>();
+    m_handlers["MSET"] = std::make_shared<MSetHandler>();
     m_handlers["MGET"] = std::make_shared<MGetHandler>();
     m_handlers["EXISTS"] = std::make_shared<ExistsHandler>();
     m_handlers["TYPE"] = std::make_shared<TypeHandler>();

@@ -5,6 +5,7 @@ Cleaner::Cleaner(asio::io_context& ctx, std::shared_ptr<ServerContext> serverCtx
 	: m_timer(ctx)
 	, m_serverCtx(serverCtx)
 {
+	m_timer.expires_after(std::chrono::seconds(1));
 	doWait();
 }
 

@@ -28,6 +28,7 @@ public:
 	int incrBy(const std::string& key, int delta = 1);
 	int append(const std::string& key, const std::string& value);
 	int strlen(const std::string& key);
+	void mset(const std::vector<std::string>& args);
 	std::vector<std::optional<String>> mget(const std::vector<std::string>& keys);
 	int exists(const std::vector<std::string>& key);
 	int ttl(const std::string& key);

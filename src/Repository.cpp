@@ -113,6 +113,13 @@ int Repository::strlen(const std::string& key)
 	return s ? s->size() : 0;
 }
 
+void Repository::mset(const std::vector<std::string>& args)
+{
+	for (int i = 0; i < args.size(); i += 2) {
+		set(args[i], args[i + 1]);
+	}
+}
+
 std::vector<std::optional<String>> Repository::mget(const std::vector<std::string>& keys)
 {
 	std::vector<std::optional<String>> out;
