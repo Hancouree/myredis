@@ -120,24 +120,17 @@ void Repository::mset(const std::vector<std::string>& args)
 	}
 }
 
-std::vector<std::optional<String>> Repository::mget(const std::vector<std::string>& keys)
+std::vector<const String*> Repository::mget(const std::vector<std::string>& keys)
 {
-	std::vector<std::optional<String>> out;
+	std::vector<const String*> out;
 	for (const auto& k : keys) {
-		auto it = m_data.find(k);
-		if (it == m_data.end()) {
-			out.push_back(std::nullopt);
+		const RecordValue* v = get(k);
+		if (!v) {
+			out.push_back(nullptr);
 			continue;
 		}
-
-		if (auto* s = std::get_if<String>(&it->second.value)) {
-			out.push_back(*s);
-		}
-		else {
-			out.push_back(std::nullopt);
-		}
+		out.push_back(std::get_if<String>(v));
 	}
-
 	return out;
 }
 
@@ -145,12 +138,9 @@ int Repository::exists(const std::vector<std::string>& keys)
 {
 	int count = 0;
 	for (const auto& k : keys) {
-		if (auto it = m_data.find(k); it != m_data.end()) {
-			if (isExpired(it->second.expires_at))
-				continue;
-
-			++count;
-		}
+		const RecordValue* v = get(k);
+		if (!v) continue;
+		++count;
 	}
 
 	return count;

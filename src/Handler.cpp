@@ -137,9 +137,9 @@ std::string MSetHandler::execute(const std::vector<std::string>& args, std::shar
 std::string MGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for MGET");
-    auto results = serverCtx->m_repo->mget({ args.begin() + 1, args.end() });
+    std::vector<const String*> results = serverCtx->m_repo->mget({ args.begin() + 1, args.end() });
     std::string out = "*" + std::to_string(results.size()) + "\r\n";
-    for (const auto& r : results) out += Utils::Resp::nullableBulk(r);
+    for (const auto* s : results) out += Utils::Resp::nullableBulk(*s);
     return out;
 }
 
