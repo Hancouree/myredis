@@ -69,10 +69,17 @@ bool Repository::del(const std::string& key)
 int Repository::incrBy(const std::string& key, int delta)
 {
 	int value = 0;
-	String* s = getTyped<String>(key);
-	if (s) value = std::stoi(*s);
+	std::optional<std::chrono::steady_clock::time_point> ttl = std::nullopt;
+	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (!std::holds_alternative<String>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+
+		value = std::stoi(std::get<String>(it->second.value));
+		ttl = it->second.expires_at;
+	}
 	value += delta;
-	m_data[key] = { std::to_string(value), std::nullopt };
+	m_data[key] = { std::to_string(value), ttl };
 	m_isCacheDirty = true;
 	return value;
 }
