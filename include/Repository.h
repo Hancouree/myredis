@@ -37,8 +37,8 @@ public:
 	List keys(const std::string& pattern);
 
 	//LIST
-	int lpush(const std::string& key, const std::string& value);
-	int rpush(const std::string& key, const std::string& value);
+	int lpush(const std::vector<std::string>& args);
+	int rpush(const std::vector<std::string>& args);
 	std::optional<String> lpop(const std::string& key);
 	std::optional<String> rpop(const std::string& key);
 	int llen(const std::string& key);

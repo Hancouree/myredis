@@ -212,40 +212,32 @@ List Repository::keys(const std::string& pattern)
 	return l;
 }
 
-int Repository::lpush(const std::string& key, const std::string& value)
+int Repository::lpush(const std::vector<std::string>& args)
 {
-	int size = 0;
+	std::string key = args[0];
+	std::vector<std::string> values = { args.begin() + 1, args.end() };
 	List* l = getTyped<List>(key);
-
-	if (l) {
-		l->push_front(value);
-		size = l->size();
+	if (!l) {
+		m_data[key] = { List{}, std::nullopt };
+		l = getTyped<List>(key);
 	}
-	else {
-		m_data[key] = { List{value}, std::nullopt };
-		size = 1;
-	}
-
+	for (const auto& v : values) l->push_front(v);
 	m_isCacheDirty = true;
-	return size;
+	return l->size();
 }
 
-int Repository::rpush(const std::string& key, const std::string& value)
+int Repository::rpush(const std::vector<std::string>& args)
 {
-	int size = 0;
+	std::string key = args[0];
+	std::vector<std::string> values = { args.begin() + 1, args.end() };
 	List* l = getTyped<List>(key);
-
-	if (l) {
-		l->push_back(value);
-		size = l->size();
+	if (!l) {
+		m_data[key] = { List{}, std::nullopt };
+		l = getTyped<List>(key);
 	}
-	else {
-		m_data[key] = { List{value}, std::nullopt };
-		size = 1;
-	}
-
+	for (const auto& v : values) l->push_back(v);
 	m_isCacheDirty = true;
-	return size;
+	return l->size();
 }
 
 std::optional<String> Repository::lpop(const std::string& key)
