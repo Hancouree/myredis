@@ -25,8 +25,8 @@ void CommandDocs::init()
     m_docs["TYPE"] = { "TYPE", "Determine the type stored at key", "1.0.0", "generic", "O(1)", {"key"} };
     m_docs["KEYS"] = { "KEYS", "Find all keys matching the given pattern", "1.0.0", "generic", "O(N)", {"pattern"} };
 
-    m_docs["LPUSH"] = { "LPUSH", "Prepend an element to a list", "1.0.0", "list", "O(1)", {"key", "element"} };
-    m_docs["RPUSH"] = { "RPUSH", "Append an element to a list", "1.0.0", "list", "O(1)", {"key", "element"} };
+    m_docs["LPUSH"] = { "LPUSH", "Prepend one or more elements to a list", "1.0.0", "list", "O(N)", {"key", "element [element ...]"} };
+    m_docs["RPUSH"] = { "RPUSH", "Append an element to a list", "1.0.0", "list", "O(N)", {"key", "element [element ...]"} };
     m_docs["LPOP"] = { "LPOP", "Remove and get the first element in a list", "1.0.0", "list", "O(1)", {"key"} };
     m_docs["RPOP"] = { "RPOP", "Remove and get the last element in a list", "1.0.0", "list", "O(1)", {"key"} };
     m_docs["LLEN"] = { "LLEN", "Get the length of a list", "1.0.0", "list", "O(1)", {"key"} };

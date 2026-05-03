@@ -195,7 +195,7 @@ std::string LPushHandler::execute(const std::vector<std::string>& args, std::sha
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for LPUSH");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->lpush({ args.begin() + 1, args.end() }));
+        return Utils::Resp::integer(serverCtx->m_repo->lpush(args[1], { args.begin() + 2, args.end() }));
     });
 }
 
@@ -203,7 +203,7 @@ std::string RPushHandler::execute(const std::vector<std::string>& args, std::sha
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for RPUSH");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->rpush({ args.begin() + 1, args.end() }));
+        return Utils::Resp::integer(serverCtx->m_repo->rpush(args[1], { args.begin() + 2, args.end() }));
     });
 }
 

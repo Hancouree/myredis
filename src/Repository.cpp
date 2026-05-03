@@ -212,10 +212,8 @@ List Repository::keys(const std::string& pattern)
 	return l;
 }
 
-int Repository::lpush(const std::vector<std::string>& args)
+int Repository::lpush(const std::string& key, const std::vector<std::string>& values)
 {
-	std::string key = args[0];
-	std::vector<std::string> values = { args.begin() + 1, args.end() };
 	List* l = getTyped<List>(key);
 	if (!l) {
 		m_data[key] = { List{}, std::nullopt };
@@ -226,10 +224,8 @@ int Repository::lpush(const std::vector<std::string>& args)
 	return l->size();
 }
 
-int Repository::rpush(const std::vector<std::string>& args)
+int Repository::rpush(const std::string& key, const std::vector<std::string>& values)
 {
-	std::string key = args[0];
-	std::vector<std::string> values = { args.begin() + 1, args.end() };
 	List* l = getTyped<List>(key);
 	if (!l) {
 		m_data[key] = { List{}, std::nullopt };
