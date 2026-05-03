@@ -1,5 +1,6 @@
 #include "../include/Handler.h"
 #include "../include/ServerContext.h"
+#include "../include/CommandDocs.h"
 #include <windows.h>
 #include <algorithm>
 
@@ -350,4 +351,25 @@ std::string HMGetHandler::execute(const std::vector<std::string>& args, std::sha
         for (const auto& r : results) out += Utils::Resp::nullableBulk(r);
         return out;
     });
+}
+
+std::string CommandHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
+{
+    if (args.size() < 2) return Utils::Resp::integer(CommandDocs::count());
+
+    std::string sub = args[1];
+    std::transform(sub.begin(), sub.end(), sub.begin(), ::toupper);
+
+    if (sub == "COUNT") {
+        return Utils::Resp::integer(CommandDocs::count());
+    }
+    else if (sub == "LIST") {
+        return Utils::Resp::list(CommandDocs::allNames());
+    }
+    else if (sub == "DOCS") {
+        std::vector<const CommandDoc*> docs = CommandDocs::lookup({ args.begin() + 2, args.end() });
+        return Utils::Resp::commandDocs(docs);
+    }
+
+    return Utils::Resp::error("unknown subcommand");
 }

@@ -1,4 +1,5 @@
 #include "../include/Utils.h"
+#include "../include/CommandDocs.h"
 #include <algorithm>
 
 namespace Utils {
@@ -63,6 +64,27 @@ namespace Utils {
 
         std::string simple(const std::string& str) {
             return "+" + str + "\r\n";
+        }
+
+        std::string commandDocs(const std::vector<const CommandDoc*>& docs)
+        {
+            std::string response = "%" + std::to_string(docs.size()) + "\r\n";
+            for (const auto& doc : docs) {
+                response += bulk(doc->name);
+                response += "%5\r\n";
+                response += bulk("summary");    response += bulk(doc->summary);
+                response += bulk("since");      response += bulk(doc->since);
+                response += bulk("group");      response += bulk(doc->group);
+                response += bulk("complexity"); response += bulk(doc->complexity);
+                response += bulk("arguments");
+                response += "*" + std::to_string(doc->arguments.size()) + "\r\n";
+                for (const auto& arg : doc->arguments) {
+                    response += "%2\r\n";
+                    response += bulk("name"); response += bulk(arg);
+                    response += bulk("type"); response += bulk("string");
+                }
+            }
+            return response;
         }
     }
 

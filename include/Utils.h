@@ -7,6 +7,7 @@
 #include <memory>
 
 class Session;
+struct CommandDoc;
 
 namespace Utils {
 	namespace Resp {
@@ -21,6 +22,7 @@ namespace Utils {
 		std::string error(const std::string& msg);
 		std::string pong();
 		std::string simple(const std::string& str);
+		std::string commandDocs(const std::vector<const CommandDoc*>& docs);
 	}
 
 	bool matches(const std::string& key, const std::string& pattern);

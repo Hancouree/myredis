@@ -27,6 +27,7 @@ void Registry::init()
     m_handlers["PERSIST"] = std::make_shared<PersistHandler>();
     m_handlers["RENAME"] = std::make_shared<RenameHandler>();
     m_handlers["KEYS"] = std::make_shared<KeysHandler>();
+    m_handlers["COMMAND"] = std::make_shared<CommandHandler>();
 
     m_handlers["LPUSH"] = std::make_shared<LPushHandler>();
     m_handlers["RPUSH"] = std::make_shared<RPushHandler>();

@@ -131,6 +131,7 @@
   <ItemGroup>
     <ClCompile Include="myredis.cpp" />
     <ClCompile Include="src\Cleaner.cpp" />
+    <ClCompile Include="src\CommandDocs.cpp" />
     <ClCompile Include="src\Handler.cpp" />
     <ClCompile Include="src\Listener.cpp" />
     <ClCompile Include="src\Parser.cpp" />
@@ -144,6 +145,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Cleaner.h" />
+    <ClInclude Include="include\CommandDocs.h" />
     <ClInclude Include="include\Handler.h" />
     <ClInclude Include="include\Listener.h" />
     <ClInclude Include="include\Parser.h" />
