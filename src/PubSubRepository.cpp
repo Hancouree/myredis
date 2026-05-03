@@ -1,9 +1,5 @@
 #include "../include/PubSubRepository.h"
 
-//
-#include <iostream>
-
-
 void PubSubRepository::subscribe(const std::string& channel, Session* session)
 {
     m_subscribers[channel].insert(session);
