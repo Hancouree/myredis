@@ -6,6 +6,7 @@
 Session::Session(tcp::socket s, std::shared_ptr<ServerContext> serverCtx)
     : m_socket(std::move(s))
     , m_serverCtx(serverCtx)
+    , m_timer(m_socket.get_executor())
 {
     m_serverCtx->incrementConnections();
 }
@@ -44,6 +45,8 @@ void Session::removePattern(const std::string& pattern)
 
 void Session::doRead()
 {
+    resetTimeout();
+
     m_socket.async_read_some(m_buffer.prepare(1024),
         [self = shared_from_this()](boost::system::error_code ec, size_t received) {
             if (!ec) {
@@ -61,21 +64,29 @@ void Session::doRead()
                     args.clear();
                 }
 
-                size_t totalSize = 0;
-                for (const auto& s : results) totalSize += s.size();
-                std::string answer;
-                answer.reserve(totalSize);
-                for (const auto& s : results) answer += s;
+                if (!results.empty()) {
+                    size_t totalSize = 0;
+                    for (const auto& s : results) totalSize += s.size();
+                    std::string answer;
+                    answer.reserve(totalSize);
+                    for (const auto& s : results) answer += s;
 
-                self->doWrite(answer);
+                    self->doWrite(answer);
+                }
+
                 self->doRead();
             }
-            else std::cout << ec.message() << "\n";
+            else {
+                if (ec != boost::asio::error::eof && ec != boost::asio::error::connection_reset) {
+                    std::cout << "Read error: " << ec.message() << "\n";
+                }
+            }
         });
 }
 
 void Session::doWrite(const std::string& msg)
 {
+    resetTimeout();
     bool in_progress = !m_writingQueue.empty();
     m_writingQueue.push(msg);
 
@@ -117,4 +128,23 @@ std::string Session::handleCommand(std::vector<std::string>& args)
     }
 
     return Registry::handle(cmd, args, m_serverCtx, this);
+}
+
+void Session::resetTimeout()
+{
+    if (isSubscribed()) {
+        m_timer.expires_after(std::chrono::hours(1));
+    }
+    else {
+        m_timer.expires_after(std::chrono::minutes(5));
+    }
+
+    auto self(shared_from_this());
+    m_timer.async_wait([this, self](boost::system::error_code ec) {
+        if (!ec) {
+            std::cout << "Session timeout. Closing connection.\n";
+            boost::system::error_code close_ec;
+            m_socket.close(close_ec);
+        }
+    });
 }

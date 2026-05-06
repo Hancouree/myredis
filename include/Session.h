@@ -13,7 +13,7 @@ public:
     Session(tcp::socket s, std::shared_ptr<ServerContext> serverCtx);
     ~Session();
 
-    void run() { doRead(); }
+    void run() { resetTimeout();  doRead(); }
     void doWrite(const std::string& msg);
 
     bool isSubscribed() const { return !m_subscribedChannels.empty() || !m_subscribedPatterns.empty(); }
@@ -29,6 +29,7 @@ private:
     void doRead();
     void doWriteNext();
     std::string handleCommand(std::vector<std::string>& args);
+    void resetTimeout();
 
     tcp::socket m_socket;
     asio::streambuf m_buffer;
@@ -37,5 +38,6 @@ private:
     std::queue<std::string> m_writingQueue;
     std::unordered_set<std::string> m_subscribedChannels;
     std::unordered_set<std::string> m_subscribedPatterns;
+    asio::steady_timer m_timer;
 };
 
