@@ -1,8 +1,23 @@
 #include "../include/Handler.h"
 #include "../include/ServerContext.h"
 #include "../include/CommandDocs.h"
-#include <windows.h>
 #include <algorithm>
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN 
+#include <Windows.h>
+#else
+#include <unistd.h>
+#endif
+
+uint32_t getCurrentProcessId()
+{
+#if defined(_WIN32)
+    return GetCurrentProcessId();
+#else
+    return static_cast<uint32_t>(getpid());
+#endif
+}
 
 std::string PingHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
@@ -64,7 +79,7 @@ std::string InfoHandler::execute(const std::vector<std::string>& args, std::shar
     ss << "server_version:1.0.0\r\n";
     ss << "uptime_in_seconds:" << std::chrono::duration_cast<std::chrono::seconds>(now - serverCtx->getStartTime()).count() << "\r\n";
     ss << "connected_clients:" << serverCtx->getConnections() << "\r\n";
-    ss << "process_id:" << GetCurrentProcessId() << "\r\n\r\n";
+    ss << "process_id:" << getCurrentProcessId() << "\r\n\r\n";
     ss << "used_memory:" << serverCtx->m_repo->getMemoryUsed() << "\r\n";
     ss << "keys_count:" << serverCtx->m_repo->count() << "\r\n\r\n";
     ss << "total_connections_received:" << serverCtx->getAllConnections() << "\r\n";
