@@ -5,13 +5,15 @@
 #include "PubSubRepository.h"
 
 class Session;
+class Config;
 
 class ServerContext {
 public:
     std::shared_ptr<Repository> m_repo;
     std::shared_ptr<PubSubRepository> m_pubSubRepo;
+    std::shared_ptr<Config> m_config;
 
-    ServerContext();
+    ServerContext(std::shared_ptr<Config> cfg);
 
     void incrementConnections();
     void decrementConnections();

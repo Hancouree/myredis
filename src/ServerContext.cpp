@@ -2,12 +2,13 @@
 #include "../include/Session.h"
 #include "../include/Utils.h"
 
-ServerContext::ServerContext()
+ServerContext::ServerContext(std::shared_ptr<Config> cfg)
     : m_activeConnections(0)
     , m_allConnections(0)
     , m_processedCommands(0)
     , m_repo(std::make_shared<Repository>())
     , m_pubSubRepo(std::make_shared<PubSubRepository>())
+    , m_config(std::move(cfg))
     , m_startTime(std::chrono::steady_clock::now())
 {
 }
