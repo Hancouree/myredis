@@ -14,5 +14,6 @@ private:
 
 	asio::steady_timer m_timer;
 	std::shared_ptr<ServerContext> m_serverCtx;
+	int m_timeout;
 };
 
