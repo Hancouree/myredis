@@ -1,5 +1,6 @@
 #include "../include/Session.h"
 #include "../include/Registry.h"
+#include "../include/Config.h"
 #include <iostream>
 #include <numeric>
 
@@ -132,12 +133,15 @@ std::string Session::handleCommand(std::vector<std::string>& args)
 
 void Session::resetTimeout()
 {
+    int timeout;
     if (isSubscribed()) {
-        m_timer.expires_after(std::chrono::hours(1));
+        timeout = m_serverCtx->m_config->getInt("subscribed_timeout", 3600);
     }
     else {
-        m_timer.expires_after(std::chrono::minutes(5));
+        timeout = m_serverCtx->m_config->getInt("timeout", 300);
     }
+
+    m_timer.expires_after(std::chrono::seconds(timeout));
 
     auto self(shared_from_this());
     m_timer.async_wait([this, self](boost::system::error_code ec) {
