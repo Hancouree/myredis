@@ -1,32 +1,70 @@
 #include "../include/Repository.h"
 #include "../include/Utils.h"
+#include "../include/ServerContext.h"
+#include "../include/Config.h"
+
+Repository::Repository(std::shared_ptr<Config> config)
+{
+	m_memoryUsed = 0;
+	m_memoryLimit = config->getInt("maxmemory", 0);
+}
 
 void Repository::performCleanup()
 {
 	auto now = std::chrono::steady_clock::now();
 	while (!m_expiringKeys.empty() && now >= m_expiringKeys.begin()->first) {
-		m_data.erase(m_expiringKeys.begin()->second);
+		const std::string& expiredKey = m_expiringKeys.begin()->second;
+		auto it = m_data.find(expiredKey);
+		if (it != m_data.end()) {
+			size_t freed = 24 + sizeof(std::string) + (expiredKey.capacity() > 15 ? expiredKey.capacity() : 0)
+				+ sizeof(RecordValue) + calculateValueMemory(it->second.value);
+			m_memoryUsed -= freed;
+			m_data.erase(it);
+		}
 		m_expiringKeys.erase(m_expiringKeys.begin());
-		m_isCacheDirty = true;
 	}
 }
 
 void Repository::set(const std::string& key, const std::string& value)
 {
-	if (auto it = m_data.find(key); it != m_data.end()) {
+	size_t incomingSize = 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0) 
+		+ sizeof(RecordValue) + calculateValueMemory(value);
+
+	auto it = m_data.find(key);
+	bool exists = it != m_data.end();
+
+	size_t freed = 0;
+	if (exists) {
+		freed = 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0)
+			+ sizeof(RecordValue) + calculateValueMemory(it->second.value);
+	}
+
+	if (m_memoryLimit > 0 && m_memoryUsed + incomingSize - freed > m_memoryLimit) {
+		throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+	}
+
+	if (exists) {
 		if (it->second.expires_at.has_value()) {
 			dropExpiration(it->second.expires_at.value(), key);
 		}
+
+		m_memoryUsed -= freed;
+		it->second = { value, std::nullopt };
+	}
+	else {
+		m_data[key] = { value, std::nullopt };
 	}
 
-	m_data[key] = { value, std::nullopt };
-	m_isCacheDirty = true;
+	m_memoryUsed += incomingSize;
 }
-
 
 bool Repository::expires(const std::string& key, int seconds)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
+		if (it->second.expires_at.has_value()) {
+			dropExpiration(it->second.expires_at.value(), key);
+		}
+
 		auto expires_at = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
 		it->second.expires_at = expires_at;
 		m_expiringKeys.insert({ expires_at, key });
@@ -36,16 +74,19 @@ bool Repository::expires(const std::string& key, int seconds)
 	return false;
 }
 
-const RecordValue* Repository::get(const std::string& key)
+RecordValue* const Repository::get(const std::string& key)
 {
 	if (auto it = m_data.find(key); it != m_data.end()) {
 		if (isExpired(it->second.expires_at)) {
+			size_t freed = 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0)
+				+ sizeof(RecordValue) + calculateValueMemory(it->second.value);
+			m_memoryUsed -= freed;
 			dropExpiration(it->second.expires_at.value(), key);
 			m_data.erase(it);
-			return nullptr;
 		}
-
-		return &it->second.value;
+		else {
+			return &it->second.value;
+		}
 	}
 
 	return nullptr;
@@ -60,12 +101,15 @@ int Repository::del(const std::vector<std::string>& keys)
 			continue;
 		}
 
+		size_t freed = 24 + sizeof(std::string) + (k.capacity() > 15 ? k.capacity() : 0)
+			+ sizeof(RecordValue) + calculateValueMemory(it->second.value);
+
 		if (it->second.expires_at.has_value()) {
 			dropExpiration(it->second.expires_at.value(), k);
 		}
 
+		m_memoryUsed -= freed;
 		m_data.erase(it);
-		m_isCacheDirty = true;
 		++count;
 	}
 
@@ -76,34 +120,70 @@ int Repository::incrBy(const std::string& key, int delta)
 {
 	int value = 0;
 	std::optional<std::chrono::steady_clock::time_point> ttl = std::nullopt;
-	if (auto it = m_data.find(key); it != m_data.end()) {
+
+	size_t freed = 0;
+	auto it = m_data.find(key);
+	if (it != m_data.end()) {
 		if (!std::holds_alternative<String>(it->second.value)) {
 			throw std::runtime_error("WRONGTYPE");
 		}
-
 		value = std::stoi(std::get<String>(it->second.value));
 		ttl = it->second.expires_at;
+		freed = 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0)
+			+ sizeof(RecordValue) + calculateValueMemory(it->second.value);
 	}
+
 	value += delta;
-	m_data[key] = { std::to_string(value), ttl };
-	m_isCacheDirty = true;
+	std::string newStr = std::to_string(value);
+	size_t incomingSize = 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0)
+		+ sizeof(RecordValue) + calculateValueMemory(newStr);
+
+	if (m_memoryLimit > 0 && m_memoryUsed - freed + incomingSize > m_memoryLimit) {
+		throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+	}
+
+	m_memoryUsed -= freed;
+	m_data[key] = { newStr, ttl };
+	m_memoryUsed += incomingSize;
 	return value;
 }
 
 int Repository::append(const std::string& key, const std::string& value)
 {
 	int size = 0;
-	String* s = getTyped<String>(key);
-	if (s) {
-		*s += value;
-		size = s->size();
+	auto it = m_data.find(key);
+	if (it != m_data.end()) {
+		if (!std::holds_alternative<String>(it->second.value)) {
+			throw std::runtime_error("WRONGTYPE");
+		}
+		String& s = std::get<String>(it->second.value);
+
+		size_t freed = s.capacity() > 15 ? s.capacity() : 0;
+		s += value;
+		size_t incomingSize = s.capacity() > 15 ? s.capacity() : 0;
+
+		if (m_memoryLimit > 0 && m_memoryUsed - freed + incomingSize > m_memoryLimit) {
+			s.resize(s.size() - value.size());
+			throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+		}
+
+		m_memoryUsed -= freed;
+		m_memoryUsed += incomingSize;
+		size = static_cast<int>(s.size());
 	}
 	else {
+		size_t incomingSize = 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0)
+			+ sizeof(RecordValue) + calculateValueMemory(value);
+
+		if (m_memoryLimit > 0 && m_memoryUsed + incomingSize > m_memoryLimit) {
+			throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+		}
+
 		m_data[key] = { value, std::nullopt };
-		size = value.size();
+		m_memoryUsed += incomingSize;
+		size = static_cast<int>(value.size());
 	}
 
-	m_isCacheDirty = true;
 	return size;
 }
 
@@ -156,7 +236,7 @@ int Repository::ttl(const std::string& key)
 	auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
 		it->second.expires_at.value() - now
 	).count();
-	return elapsed;
+	return elapsed < 0 ? 0 : elapsed;
 }
 
 bool Repository::persist(const std::string& key)
@@ -182,6 +262,9 @@ void Repository::rename(const std::string& key, const std::string& newKey)
 		if (e_it->second.expires_at.has_value()) {
 			dropExpiration(e_it->second.expires_at.value(), newKey);
 		}
+		size_t freed = 24 + sizeof(std::string) + (newKey.capacity() > 15 ? newKey.capacity() : 0)
+			+ sizeof(RecordValue) + calculateValueMemory(e_it->second.value);
+		m_memoryUsed -= freed;
 		m_data.erase(e_it);
 	}
 
@@ -195,7 +278,6 @@ void Repository::rename(const std::string& key, const std::string& newKey)
 	}
 
 	m_data[newKey] = { std::move(value), expires_at };
-	m_isCacheDirty = true;
 }
 
 List Repository::keys(const std::string& pattern)
@@ -214,25 +296,49 @@ List Repository::keys(const std::string& pattern)
 
 int Repository::lpush(const std::string& key, const std::vector<std::string>& values)
 {
+	size_t incomingSize = 0;
+
 	List* l = getTyped<List>(key);
 	if (!l) {
+		incomingSize += 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0)
+			+ sizeof(RecordValue);
+
 		m_data[key] = { List{}, std::nullopt };
 		l = getTyped<List>(key);
 	}
-	for (const auto& v : values) l->push_front(v);
-	m_isCacheDirty = true;
+	for (const auto& v : values) {
+		incomingSize += sizeof(std::string) + calculateValueMemory(v);
+		if (m_memoryLimit > 0 && m_memoryUsed + incomingSize > m_memoryLimit) {
+			throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+		}
+
+		l->push_front(v);
+	}
+	m_memoryUsed += incomingSize;
 	return l->size();
 }
 
 int Repository::rpush(const std::string& key, const std::vector<std::string>& values)
 {
+	size_t incomingSize = 0;
+
 	List* l = getTyped<List>(key);
 	if (!l) {
+		incomingSize += 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0)
+			+ sizeof(RecordValue);
+
 		m_data[key] = { List{}, std::nullopt };
 		l = getTyped<List>(key);
 	}
-	for (const auto& v : values) l->push_back(v);
-	m_isCacheDirty = true;
+	for (const auto& v : values) {
+		incomingSize += sizeof(std::string) + calculateValueMemory(v);
+		if (m_memoryLimit > 0 && m_memoryUsed + incomingSize > m_memoryLimit) {
+			throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+		}
+
+		l->push_back(v);
+	}
+	m_memoryUsed += incomingSize;
 	return l->size();
 }
 
@@ -241,9 +347,12 @@ std::optional<String> Repository::lpop(const std::string& key)
 	List* l = getTyped<List>(key);
 	if (!l || l->empty()) return std::nullopt;
 
-	std::string popped = l->front();
+	std::string popped = std::move(l->front());
+
+	size_t freed = sizeof(std::string) + (popped.capacity() > 15 ? popped.capacity() : 0);
+
 	l->pop_front();
-	m_isCacheDirty = true;
+	m_memoryUsed -= freed;
 	if (l->empty()) del({ key });
 	return popped;
 }
@@ -253,9 +362,12 @@ std::optional<String> Repository::rpop(const std::string& key)
 	List* l = getTyped<List>(key);
 	if (!l || l->empty()) return std::nullopt;
 
-	std::string popped = l->back();
+	std::string popped = std::move(l->back());
+
+	size_t freed = sizeof(std::string) + (popped.capacity() > 15 ? popped.capacity() : 0);
+
 	l->pop_back();
-	m_isCacheDirty = true;
+	m_memoryUsed -= freed;
 	if (l->empty()) del({ key });
 	return popped;
 }
@@ -270,8 +382,8 @@ std::optional<String> Repository::lindex(const std::string& key, int idx)
 {
 	List* l = getTyped<List>(key);
 	if (!l) return std::nullopt;
-	if (idx < 0) idx = (int)l->size() + idx;
-	if (idx >= 0 && idx < (int)l->size()) return l->at(idx);
+	if (idx < 0) idx = l->size() + idx;
+	if (idx >= 0 && idx < l->size()) return l->at(idx);
 	return std::nullopt;
 }
 
@@ -297,13 +409,18 @@ int Repository::linsert(const std::string& key, const std::string& where, const 
 	auto pivot_it = std::find(l->begin(), l->end(), pivot);
 	if (pivot_it == l->end()) return -1;
 
+	size_t incomingSize = sizeof(std::string) + calculateValueMemory(value);
+	if (m_memoryLimit > 0 && m_memoryUsed + incomingSize > m_memoryLimit) {
+		throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+	}
+
 	if (where == "BEFORE") {
 		l->insert(pivot_it, value);
-		m_isCacheDirty = true;
+		m_memoryUsed += incomingSize;
 	}
 	else if (where == "AFTER") {
 		l->insert(pivot_it + 1, value);
-		m_isCacheDirty = true;
+		m_memoryUsed += incomingSize;
 	}
 
 	return l->size();
@@ -314,12 +431,18 @@ void Repository::lset(const std::string& key, int idx, const std::string& value)
 	List* l = getTyped<List>(key);
 	if (!l) throw std::runtime_error("no such key");
 
-	if (idx < 0) idx = l->size() + idx;
-	if (idx < 0 || idx >= l->size()) 
+	if (idx < 0) idx = static_cast<int>(l->size()) + idx;
+	if (idx < 0 || idx >= static_cast<int>(l->size()))
 		throw std::runtime_error("index out of range");
 
+	size_t freed = sizeof(std::string) + calculateValueMemory((*l)[idx]);
+	size_t incomingSize = sizeof(std::string) + calculateValueMemory(value);
+	if (m_memoryLimit > 0 && m_memoryUsed - freed + incomingSize > m_memoryLimit) {
+		throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+	}
+	m_memoryUsed -= freed;
 	(*l)[idx] = value;
-	m_isCacheDirty = true;
+	m_memoryUsed += incomingSize;
 }
 
 void Repository::ltrim(const std::string& key, int start, int stop)
@@ -327,12 +450,20 @@ void Repository::ltrim(const std::string& key, int start, int stop)
 	List* l = getTyped<List>(key);
 	if (!l) return;
 
-	if (start < 0) start = l->size() + start;
-	if (stop < 0) stop = l->size() + stop;
+	int size = static_cast<int>(l->size());
+	if (start < 0) start = size + start;
+	if (stop < 0) stop = size + stop;
 
 	start = std::max(start, 0);
-	stop = std::min(stop, (int)l->size() - 1);
+	stop = std::min(stop, size - 1);
 	if (start > stop) { del({ key }); return; }
+
+	size_t freed = 0;
+	for (int i = 0; i < start; ++i)
+		freed += sizeof(std::string) + calculateValueMemory((*l)[i]);
+	for (int i = stop + 1; i < size; ++i)
+		freed += sizeof(std::string) + calculateValueMemory((*l)[i]);
+	m_memoryUsed -= freed;
 
 	*l = List(l->begin() + start, l->begin() + stop + 1);
 }
@@ -341,12 +472,39 @@ int Repository::hset(const std::string& key, const std::string& field, const std
 {
 	Hash* h = getTyped<Hash>(key);
 	if (h) {
+		auto existing = h->find(field);
+		size_t freed = 0;
+		if (existing != h->end()) {
+			freed = 24 + sizeof(std::pair<std::string, std::string>)
+				+ (field.capacity() > 15 ? field.capacity() : 0)
+				+ (existing->second.capacity() > 15 ? existing->second.capacity() : 0);
+		}
+		size_t incomingSize = 24 + sizeof(std::pair<std::string, std::string>)
+			+ (field.capacity() > 15 ? field.capacity() : 0)
+			+ (value.capacity() > 15 ? value.capacity() : 0);
+
+		if (m_memoryLimit > 0 && m_memoryUsed - freed + incomingSize > m_memoryLimit) {
+			throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+		}
+
 		auto [it_h, inserted] = h->insert_or_assign(field, value);
-		m_isCacheDirty = true;
+		m_memoryUsed -= freed;
+		m_memoryUsed += incomingSize;
 		return inserted ? 1 : 0;
 	}
+
+	size_t incomingSize = 24 + sizeof(std::string) + (key.capacity() > 15 ? key.capacity() : 0)
+		+ sizeof(RecordValue)
+		+ 24 + sizeof(std::pair<std::string, std::string>)
+		+ (field.capacity() > 15 ? field.capacity() : 0)
+		+ (value.capacity() > 15 ? value.capacity() : 0);
+
+	if (m_memoryLimit > 0 && m_memoryUsed + incomingSize > m_memoryLimit) {
+		throw std::runtime_error("OOM command not allowed when used memory > 'maxmemory'");
+	}
+
 	m_data[key] = { Hash{{field, value}}, std::nullopt };
-	m_isCacheDirty = true;
+	m_memoryUsed += incomingSize;
 	return 1;
 }
 
@@ -367,14 +525,19 @@ bool Repository::hdel(const std::string& key, const std::string& field)
 {
 	Hash* h = getTyped<Hash>(key);
 	if (!h) return false;
-	bool erased = h->erase(field) > 0;
-	if (erased) {
-		m_isCacheDirty = true;
-		if (h->empty()) del({ key });
-	}
-	return erased;
-}
 
+	auto it = h->find(field);
+	if (it == h->end()) return false;
+
+	size_t freed = 24 + sizeof(std::pair<std::string, std::string>)
+		+ (field.capacity() > 15 ? field.capacity() : 0)
+		+ (it->second.capacity() > 15 ? it->second.capacity() : 0);
+	m_memoryUsed -= freed;
+
+	h->erase(it);
+	if (h->empty()) del({ key });
+	return true;
+}
 bool Repository::hexists(const std::string& key, const std::string& field)
 {
 	Hash* h = getTyped<Hash>(key);
@@ -435,34 +598,38 @@ bool Repository::isExpired(const std::optional<std::chrono::steady_clock::time_p
 	return now >= tp;
 }
 
-size_t Repository::getMemoryUsed()
+size_t Repository::calculateValueMemory(const RecordValue& v)
 {
-	if (m_isCacheDirty) {
-		m_cachedMemoryUsed = 0;
-		for (const auto& [key, record] : m_data) {
-			m_cachedMemoryUsed += key.size() + sizeof(std::pair<const std::string, Record>) + 24;
+	return std::visit([](auto&& arg) -> size_t {
+		using T = std::decay_t<decltype(arg)>;
 
-			if (auto* s = std::get_if<String>(&record.value)) {
-				m_cachedMemoryUsed += s->size();
+		if constexpr (std::is_same_v<T, std::string>) {
+			return (arg.capacity() > 15 ? arg.capacity() : 0);
+		}
+		else if constexpr (std::is_same_v<T, std::deque<std::string>>) {
+			size_t sum = 0;
+			for (const auto& s : arg) {
+				sum += sizeof(std::string) + (s.capacity() > 15 ? s.capacity() : 0);
 			}
-			else if (auto* l = std::get_if<List>(&record.value)) {
-				m_cachedMemoryUsed += sizeof(List);
-				for (const auto& item : *l) {
-					m_cachedMemoryUsed += item.size();
-				}
+			return sum;
+		}
+		else if constexpr (std::is_same_v<T, std::unordered_map<std::string, std::string>>) {
+			size_t sum = 0;
+			for (const auto& [k, val] : arg) {
+				sum += 24 + sizeof(std::pair<std::string, std::string>) +
+					(k.capacity() > 15 ? k.capacity() : 0) +
+					(val.capacity() > 15 ? val.capacity() : 0);
 			}
-			else if (auto* h = std::get_if<Hash>(&record.value)) {
-				m_cachedMemoryUsed += sizeof(Hash);
-				for (const auto& [field, value] : *h) {
-					m_cachedMemoryUsed += field.size() + value.size() + 24;
-				}
-			}
+			return sum;
 		}
 
-		m_isCacheDirty = false;
-	}
+		return 0;
+	}, v);
+}
 
-	return m_cachedMemoryUsed;
+size_t Repository::getMemoryUsed()
+{
+	return m_memoryUsed;
 }
 
 size_t Repository::count() const

@@ -5,7 +5,10 @@
 #include <optional>
 #include <variant>
 #include <deque>
+#include <vector>
+#include <memory>
 #include <chrono>
+#include <stdexcept>
 
 class Config;
 
@@ -27,7 +30,7 @@ public:
 	void performCleanup();
 	void set(const std::string& key, const std::string& value);
 	bool expires(const std::string& key, int seconds);
-	const RecordValue* get(const std::string& key);
+	RecordValue* const get(const std::string& key);
 	int del(const std::vector<std::string>& keys);
 	int incrBy(const std::string& key, int delta = 1);
 	int append(const std::string& key, const std::string& value);
@@ -72,13 +75,13 @@ private:
 
 	template <typename T>
 	T* getTyped(const std::string& key) {
-		auto it = m_data.find(key);
-		if (it == m_data.end()) return nullptr;
-		if (!std::holds_alternative<T>(it->second.value)) {
+		RecordValue* const v = get(key);
+		if (!v) return nullptr;
+		if (!std::holds_alternative<T>(*v)) {
 			throw std::runtime_error("WRONGTYPE");
 		}
 
-		return &std::get<T>(it->second.value);
+		return &std::get<T>(*v);
 	}
 
 	std::unordered_map<std::string, Record> m_data;

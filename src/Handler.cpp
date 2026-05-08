@@ -30,8 +30,10 @@ std::string SetHandler::execute(const std::vector<std::string>& args, std::share
         return Utils::Resp::error("wrong number of arguments for SET");
     }
 
-    serverCtx->m_repo->set(args[1], args[2]);
-    return Utils::Resp::ok();
+    return tryExecute([&]() {
+        serverCtx->m_repo->set(args[1], args[2]);
+        return Utils::Resp::ok();
+    });
 }
 
 std::string GetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
@@ -40,7 +42,7 @@ std::string GetHandler::execute(const std::vector<std::string>& args, std::share
         return Utils::Resp::error("wrong number of arguments for GET");
     }
 
-    const RecordValue* val = serverCtx->m_repo->get(args[1]);
+    RecordValue* const val = serverCtx->m_repo->get(args[1]);
     if (!val) return Utils::Resp::nil();
     if (auto* s = std::get_if<String>(val)) {
         return Utils::Resp::bulk(*s);
@@ -168,7 +170,7 @@ std::string ExistsHandler::execute(const std::vector<std::string>& args, std::sh
 std::string TypeHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for TYPE");
-    const RecordValue* v = serverCtx->m_repo->get(args[1]);
+    RecordValue* const v = serverCtx->m_repo->get(args[1]);
     if (!v) return Utils::Resp::simple("none");
     return std::visit([](auto&& arg) -> std::string {
         using T = std::decay_t<decltype(arg)>;

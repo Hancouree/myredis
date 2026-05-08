@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <unordered_set>
+#include <atomic>
 #include "Repository.h"
 #include "PubSubRepository.h"
 
@@ -9,9 +10,9 @@ class Config;
 
 class ServerContext {
 public:
+    std::shared_ptr<Config> m_config;
     std::shared_ptr<Repository> m_repo;
     std::shared_ptr<PubSubRepository> m_pubSubRepo;
-    std::shared_ptr<Config> m_config;
 
     ServerContext(std::shared_ptr<Config> cfg);
 

@@ -30,9 +30,6 @@
     <ClCompile Include="src\Registry.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\Repository.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="src\ServerContext.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
@@ -55,6 +52,9 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="src\Config.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Repository.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
