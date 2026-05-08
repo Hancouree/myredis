@@ -7,6 +7,8 @@
 #include <deque>
 #include <chrono>
 
+class Config;
+
 using String = std::string;
 using List = std::deque<std::string>;
 using Hash = std::unordered_map<std::string, std::string>;
@@ -20,6 +22,8 @@ struct Record {
 class Repository
 {
 public:
+	Repository(std::shared_ptr<Config> config);
+
 	void performCleanup();
 	void set(const std::string& key, const std::string& value);
 	bool expires(const std::string& key, int seconds);
@@ -64,7 +68,8 @@ public:
 private:
 	void dropExpiration(const std::chrono::steady_clock::time_point& tp, const std::string& key);
 	bool isExpired(const std::optional<std::chrono::steady_clock::time_point>& tp);
-	
+	size_t calculateValueMemory(const RecordValue& v);
+
 	template <typename T>
 	T* getTyped(const std::string& key) {
 		auto it = m_data.find(key);
@@ -78,6 +83,6 @@ private:
 
 	std::unordered_map<std::string, Record> m_data;
 	std::multimap<std::chrono::steady_clock::time_point, std::string> m_expiringKeys;
-	bool m_isCacheDirty = true;
-	size_t m_cachedMemoryUsed = 0;
+	size_t m_memoryUsed;
+	size_t m_memoryLimit;
 };
