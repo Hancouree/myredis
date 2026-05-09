@@ -25,7 +25,7 @@ struct Record {
 class Repository
 {
 public:
-	Repository(std::shared_ptr<Config> config);
+	Repository(const Config& config);
 
 	void performCleanup();
 	void set(const std::string& key, const std::string& value);

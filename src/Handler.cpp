@@ -31,7 +31,7 @@ std::string SetHandler::execute(const std::vector<std::string>& args, std::share
     }
 
     return tryExecute([&]() {
-        serverCtx->m_repo->set(args[1], args[2]);
+        serverCtx->repo().set(args[1], args[2]);
         return Utils::Resp::ok();
     });
 }
@@ -42,7 +42,7 @@ std::string GetHandler::execute(const std::vector<std::string>& args, std::share
         return Utils::Resp::error("wrong number of arguments for GET");
     }
 
-    RecordValue* const val = serverCtx->m_repo->get(args[1]);
+    RecordValue* const val = serverCtx->repo().get(args[1]);
     if (!val) return Utils::Resp::nil();
     if (auto* s = std::get_if<String>(val)) {
         return Utils::Resp::bulk(*s);
@@ -59,7 +59,7 @@ std::string ExpireHandler::execute(const std::vector<std::string>& args, std::sh
 
     return tryExecute([&]() {
         int seconds = std::stoi(args[2]);
-        return serverCtx->m_repo->expires(args[1], seconds) ? Utils::Resp::integer(1) : Utils::Resp::integer(0);
+        return serverCtx->repo().expires(args[1], seconds) ? Utils::Resp::integer(1) : Utils::Resp::integer(0);
     });
 }
 
@@ -69,7 +69,7 @@ std::string DelHandler::execute(const std::vector<std::string>& args, std::share
         return Utils::Resp::error("wrong number of arguments for DEL");
     }
 
-    return Utils::Resp::integer(serverCtx->m_repo->del({ args.begin() + 1, args.end() }));
+    return Utils::Resp::integer(serverCtx->repo().del({ args.begin() + 1, args.end() }));
 }
 
 std::string InfoHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
@@ -82,8 +82,8 @@ std::string InfoHandler::execute(const std::vector<std::string>& args, std::shar
     ss << "uptime_in_seconds:" << std::chrono::duration_cast<std::chrono::seconds>(now - serverCtx->getStartTime()).count() << "\r\n";
     ss << "connected_clients:" << serverCtx->getConnections() << "\r\n";
     ss << "process_id:" << getCurrentProcessId() << "\r\n\r\n";
-    ss << "used_memory:" << serverCtx->m_repo->getMemoryUsed() << "\r\n";
-    ss << "keys_count:" << serverCtx->m_repo->count() << "\r\n\r\n";
+    ss << "used_memory:" << serverCtx->repo().getMemoryUsed() << "\r\n";
+    ss << "keys_count:" << serverCtx->repo().count() << "\r\n\r\n";
     ss << "total_connections_received:" << serverCtx->getAllConnections() << "\r\n";
     ss << "total_commands_processed:" << serverCtx->getAllProcessedCommands() << "\r\n";
     return Utils::Resp::bulk(ss.str());
@@ -96,7 +96,7 @@ std::string IncrHandler::execute(const std::vector<std::string>& args, std::shar
     }
 
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->incrBy(args[1]));
+        return Utils::Resp::integer(serverCtx->repo().incrBy(args[1]));
     });
 }
 
@@ -107,7 +107,7 @@ std::string IncrByHandler::execute(const std::vector<std::string>& args, std::sh
     }
 
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->incrBy(args[1], std::stoi(args[2])));
+        return Utils::Resp::integer(serverCtx->repo().incrBy(args[1], std::stoi(args[2])));
     });
 }
 
@@ -118,14 +118,14 @@ std::string DecrHandler::execute(const std::vector<std::string>& args, std::shar
     }
 
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->incrBy(args[1], -1));
+        return Utils::Resp::integer(serverCtx->repo().incrBy(args[1], -1));
     });
 }
 std::string DecrByHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for DECRBY");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->incrBy(args[1], -std::stoi(args[2])));
+        return Utils::Resp::integer(serverCtx->repo().incrBy(args[1], -std::stoi(args[2])));
     });
 }
 
@@ -133,7 +133,7 @@ std::string StrlenHandler::execute(const std::vector<std::string>& args, std::sh
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for STRLEN");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->strlen(args[1]));
+        return Utils::Resp::integer(serverCtx->repo().strlen(args[1]));
     });
 }
 
@@ -141,21 +141,21 @@ std::string AppendHandler::execute(const std::vector<std::string>& args, std::sh
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for APPEND");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->append(args[1], args[2]));
+        return Utils::Resp::integer(serverCtx->repo().append(args[1], args[2]));
     });
 }
 
 std::string MSetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2 || args.size() % 2 == 0) return Utils::Resp::error("wrong number of arguments for MSET");
-    serverCtx->m_repo->mset({ args.begin() + 1, args.end() });
+    serverCtx->repo().mset({ args.begin() + 1, args.end() });
     return Utils::Resp::ok();
 }
 
 std::string MGetHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for MGET");
-    std::vector<const String*> results = serverCtx->m_repo->mget({ args.begin() + 1, args.end() });
+    std::vector<const String*> results = serverCtx->repo().mget({ args.begin() + 1, args.end() });
     std::string out = "*" + std::to_string(results.size()) + "\r\n";
     for (const auto* s : results) out += s ? Utils::Resp::bulk(*s) : Utils::Resp::nil();
     return out;
@@ -164,13 +164,13 @@ std::string MGetHandler::execute(const std::vector<std::string>& args, std::shar
 std::string ExistsHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for EXISTS");
-    return Utils::Resp::integer(serverCtx->m_repo->exists({ args.begin() + 1, args.end() }));
+    return Utils::Resp::integer(serverCtx->repo().exists({ args.begin() + 1, args.end() }));
 }
 
 std::string TypeHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for TYPE");
-    RecordValue* const v = serverCtx->m_repo->get(args[1]);
+    RecordValue* const v = serverCtx->repo().get(args[1]);
     if (!v) return Utils::Resp::simple("none");
     return std::visit([](auto&& arg) -> std::string {
         using T = std::decay_t<decltype(arg)>;
@@ -184,20 +184,20 @@ std::string TypeHandler::execute(const std::vector<std::string>& args, std::shar
 std::string TtlHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for TTL");
-    return Utils::Resp::integer(serverCtx->m_repo->ttl(args[1]));
+    return Utils::Resp::integer(serverCtx->repo().ttl(args[1]));
 }
 
 std::string PersistHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for PERSIST");
-    return Utils::Resp::integer(serverCtx->m_repo->persist(args[1]) ? 1 : 0);
+    return Utils::Resp::integer(serverCtx->repo().persist(args[1]) ? 1 : 0);
 }
 
 std::string RenameHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for RENAME");
     return tryExecute([&]() {
-        serverCtx->m_repo->rename(args[1], args[2]);
+        serverCtx->repo().rename(args[1], args[2]);
         return Utils::Resp::ok();
     });
 }
@@ -205,14 +205,14 @@ std::string RenameHandler::execute(const std::vector<std::string>& args, std::sh
 std::string KeysHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for KEYS");
-    return Utils::Resp::list(serverCtx->m_repo->keys(args[1]));
+    return Utils::Resp::list(serverCtx->repo().keys(args[1]));
 }
 
 std::string LPushHandler::execute(const std::vector<std::string>& args, std::shared_ptr<ServerContext>& serverCtx)
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for LPUSH");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->lpush(args[1], { args.begin() + 2, args.end() }));
+        return Utils::Resp::integer(serverCtx->repo().lpush(args[1], { args.begin() + 2, args.end() }));
     });
 }
 
@@ -220,7 +220,7 @@ std::string RPushHandler::execute(const std::vector<std::string>& args, std::sha
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for RPUSH");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->rpush(args[1], { args.begin() + 2, args.end() }));
+        return Utils::Resp::integer(serverCtx->repo().rpush(args[1], { args.begin() + 2, args.end() }));
     });
 }
 
@@ -228,7 +228,7 @@ std::string LPopHandler::execute(const std::vector<std::string>& args, std::shar
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for LPOP");
     return tryExecute([&]() {
-        return Utils::Resp::nullableBulk(serverCtx->m_repo->lpop(args[1]));
+        return Utils::Resp::nullableBulk(serverCtx->repo().lpop(args[1]));
     });
 }
 
@@ -236,7 +236,7 @@ std::string RPopHandler::execute(const std::vector<std::string>& args, std::shar
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for RPOP");
     return tryExecute([&]() {
-        return Utils::Resp::nullableBulk(serverCtx->m_repo->rpop(args[1]));
+        return Utils::Resp::nullableBulk(serverCtx->repo().rpop(args[1]));
     });
 }
 
@@ -244,7 +244,7 @@ std::string LLenHandler::execute(const std::vector<std::string>& args, std::shar
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for LLEN");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->llen(args[1]));
+        return Utils::Resp::integer(serverCtx->repo().llen(args[1]));
     });
 }
 
@@ -252,7 +252,7 @@ std::string LIndexHandler::execute(const std::vector<std::string>& args, std::sh
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for LINDEX");
     return tryExecute([&]() {
-        return Utils::Resp::nullableBulk(serverCtx->m_repo->lindex(args[1], std::stoi(args[2])));
+        return Utils::Resp::nullableBulk(serverCtx->repo().lindex(args[1], std::stoi(args[2])));
     });
 }
 
@@ -260,7 +260,7 @@ std::string LRangeHandler::execute(const std::vector<std::string>& args, std::sh
 {
     if (args.size() < 4) return Utils::Resp::error("wrong number of arguments for LRANGE");
     return tryExecute([&]() {
-        return Utils::Resp::list(serverCtx->m_repo->lrange(args[1], std::stoi(args[2]), std::stoi(args[3])));
+        return Utils::Resp::list(serverCtx->repo().lrange(args[1], std::stoi(args[2]), std::stoi(args[3])));
     });
 }
 
@@ -272,7 +272,7 @@ std::string LInsertHandler::execute(const std::vector<std::string>& args, std::s
         std::transform(where.begin(), where.end(), where.begin(), ::toupper);
         if (where != "BEFORE" && where != "AFTER")
             return Utils::Resp::error("syntax error");
-        return Utils::Resp::integer(serverCtx->m_repo->linsert(args[1], where, args[3], args[4]));
+        return Utils::Resp::integer(serverCtx->repo().linsert(args[1], where, args[3], args[4]));
     });
 }
 
@@ -280,7 +280,7 @@ std::string LSetHandler::execute(const std::vector<std::string>& args, std::shar
 {
     if (args.size() < 4) return Utils::Resp::error("wrong number of arguments for LSET");
     return tryExecute([&]() {
-        serverCtx->m_repo->lset(args[1], std::stoi(args[2]), args[3]);
+        serverCtx->repo().lset(args[1], std::stoi(args[2]), args[3]);
         return Utils::Resp::ok();
     });
 }
@@ -289,7 +289,7 @@ std::string LTrimHandler::execute(const std::vector<std::string>& args, std::sha
 {
     if (args.size() < 4) return Utils::Resp::error("wrong number of arguments for LTRIM");
     return tryExecute([&]() {
-        serverCtx->m_repo->ltrim(args[1], std::stoi(args[2]), std::stoi(args[3]));
+        serverCtx->repo().ltrim(args[1], std::stoi(args[2]), std::stoi(args[3]));
         return Utils::Resp::ok();
     });
 }
@@ -298,7 +298,7 @@ std::string HSetHandler::execute(const std::vector<std::string>& args, std::shar
 {
     if (args.size() < 4) return Utils::Resp::error("wrong number of arguments for HSET");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->hset(args[1], args[2], args[3]));
+        return Utils::Resp::integer(serverCtx->repo().hset(args[1], args[2], args[3]));
     });
 }
 
@@ -306,7 +306,7 @@ std::string HGetHandler::execute(const std::vector<std::string>& args, std::shar
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for HGET");
     return tryExecute([&]() {
-        return Utils::Resp::nullableBulk(serverCtx->m_repo->hget(args[1], args[2]));
+        return Utils::Resp::nullableBulk(serverCtx->repo().hget(args[1], args[2]));
     });
 }
 
@@ -314,7 +314,7 @@ std::string HGetAllHandler::execute(const std::vector<std::string>& args, std::s
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for HGETALL");
     return tryExecute([&]() {
-        const Hash* h = serverCtx->m_repo->hgetall(args[1]);
+        const Hash* h = serverCtx->repo().hgetall(args[1]);
         return h ? Utils::Resp::hash(*h) : Utils::Resp::emptyArr();
     });
 }
@@ -323,7 +323,7 @@ std::string HDelHandler::execute(const std::vector<std::string>& args, std::shar
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for HDEL");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->hdel(args[1], args[2]) ? 1 : 0);
+        return Utils::Resp::integer(serverCtx->repo().hdel(args[1], args[2]) ? 1 : 0);
     });
 }
 
@@ -331,7 +331,7 @@ std::string HExistsHandler::execute(const std::vector<std::string>& args, std::s
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for HEXISTS");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->hexists(args[1], args[2]) ? 1 : 0);
+        return Utils::Resp::integer(serverCtx->repo().hexists(args[1], args[2]) ? 1 : 0);
     });
 }
 
@@ -339,7 +339,7 @@ std::string HLenHandler::execute(const std::vector<std::string>& args, std::shar
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for HLEN");
     return tryExecute([&]() {
-        return Utils::Resp::integer(serverCtx->m_repo->hlen(args[1]));
+        return Utils::Resp::integer(serverCtx->repo().hlen(args[1]));
     });
 }
 
@@ -347,7 +347,7 @@ std::string HKeysHandler::execute(const std::vector<std::string>& args, std::sha
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for HKEYS");
     return tryExecute([&]() {
-        return Utils::Resp::list(serverCtx->m_repo->hkeys(args[1]));
+        return Utils::Resp::list(serverCtx->repo().hkeys(args[1]));
     });
 }
 
@@ -355,7 +355,7 @@ std::string HValsHandler::execute(const std::vector<std::string>& args, std::sha
 {
     if (args.size() < 2) return Utils::Resp::error("wrong number of arguments for HVALS");
     return tryExecute([&]() {
-        return Utils::Resp::list(serverCtx->m_repo->hvals(args[1]));
+        return Utils::Resp::list(serverCtx->repo().hvals(args[1]));
     });
 }
 
@@ -363,7 +363,7 @@ std::string HMGetHandler::execute(const std::vector<std::string>& args, std::sha
 {
     if (args.size() < 3) return Utils::Resp::error("wrong number of arguments for HMGET");
     return tryExecute([&]() {
-        auto results = serverCtx->m_repo->hmget(args[1], { args.begin() + 2, args.end() });
+        auto results = serverCtx->repo().hmget(args[1], { args.begin() + 2, args.end() });
         std::string out = "*" + std::to_string(results.size()) + "\r\n";
         for (const auto& r : results) out += Utils::Resp::nullableBulk(r);
         return out;

@@ -7,8 +7,7 @@
 
 int main()
 {
-    auto cfg = std::make_shared<Config>("myredis.conf");
-    auto serverCtx = std::make_shared<ServerContext>(cfg);
+    auto serverCtx = std::make_shared<ServerContext>(Config("myredis.conf"));
     
     Registry::init();
     CommandDocs::init();

@@ -15,10 +15,10 @@ Session::Session(tcp::socket s, std::shared_ptr<ServerContext> serverCtx)
 Session::~Session()
 {
     for (const auto& pattern : m_subscribedPatterns) {
-        m_serverCtx->m_pubSubRepo->punsubscribe(pattern, this);
+        m_serverCtx->pubsubRepo().punsubscribe(pattern, this);
     }
     for (const auto& channel : m_subscribedChannels) {
-        m_serverCtx->m_pubSubRepo->unsubscribe(channel, this);
+        m_serverCtx->pubsubRepo().unsubscribe(channel, this);
     }
 
     m_serverCtx->decrementConnections();
@@ -135,10 +135,10 @@ void Session::resetTimeout()
 {
     int timeout;
     if (isSubscribed()) {
-        timeout = m_serverCtx->m_config->getInt("subscribed_timeout", 3600);
+        timeout = m_serverCtx->config().getInt("subscribed_timeout", 3600);
     }
     else {
-        timeout = m_serverCtx->m_config->getInt("timeout", 300);
+        timeout = m_serverCtx->config().getInt("timeout", 300);
     }
 
     m_timer.expires_after(std::chrono::seconds(timeout));

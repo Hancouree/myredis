@@ -39,16 +39,16 @@ void Config::init(const std::string& file)
 	}
 }
 
-std::string Config::getStr(const std::string& key, const std::string& defaultVal)
+std::string Config::getStr(const std::string& key, const std::string& defaultVal) const
 {
-	return m_options.contains(key) ? m_options[key] : defaultVal;
+	return m_options.contains(key) ? m_options.at(key) : defaultVal;
 }
 
-int Config::getInt(const std::string& key, int defaultVal)
+int Config::getInt(const std::string& key, int defaultVal) const
 {
 	try
 	{
-		return m_options.contains(key) ? std::stoi(m_options[key]) : defaultVal;
+		return m_options.contains(key) ? std::stoi(m_options.at(key)) : defaultVal;
 	}
 	catch (...)
 	{

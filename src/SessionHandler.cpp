@@ -14,7 +14,7 @@ std::string SubscribeHandler::execute(
     std::vector<std::string> channelsToSubscribe = { args.begin() + 1, args.end() };
     std::string response = "";
     for (const auto& c : channelsToSubscribe) {
-        serverCtx->m_pubSubRepo->subscribe(c, session);
+        serverCtx->pubsubRepo().subscribe(c, session);
         session->addChannel(c);
 
         response += "*3\r\n" +
@@ -36,7 +36,7 @@ std::string PublishHandler::execute(
     }
 
     std::string channel = args[1];
-    int count = serverCtx->m_pubSubRepo->publish(channel, args[2], 
+    int count = serverCtx->pubsubRepo().publish(channel, args[2],
         [](Session* sub, const std::string& channel, const std::string& pattern, const std::string& payload) {
             std::string formattedResp;
             if (pattern.empty()) {
@@ -65,7 +65,7 @@ std::string PSubscribeHandler::execute(
     std::vector<std::string> patternsToSubscribe = { args.begin() + 1, args.end() };
     std::string response = "";
     for (const auto& p : patternsToSubscribe) {
-        serverCtx->m_pubSubRepo->psubscribe(p, session);
+        serverCtx->pubsubRepo().psubscribe(p, session);
         session->addPattern(p);
 
         response += "*3\r\n" +
@@ -94,7 +94,7 @@ std::string UnsubscribeHandler::execute(
 
     std::string response = "";
     for (const auto& channel : channelsToRemove) {
-        serverCtx->m_pubSubRepo->unsubscribe(channel, session);
+        serverCtx->pubsubRepo().unsubscribe(channel, session);
         session->removeChannel(channel);
 
         response += "*3\r\n" +
@@ -130,7 +130,7 @@ std::string PUnsubscribeHandler::execute(
 
     std::string response = "";
     for (const auto& pattern : patternsToRemove) {
-        serverCtx->m_pubSubRepo->punsubscribe(pattern, session);
+        serverCtx->pubsubRepo().punsubscribe(pattern, session);
         session->removePattern(pattern);
 
         response += "*3\r\n" +
@@ -161,13 +161,13 @@ std::string PubSubChannelsHandler::execute(
     std::string subCommand = args[1];
     std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::toupper);
     if (subCommand == "CHANNELS") {
-        return Utils::Resp::list(serverCtx->m_pubSubRepo->channels(args.size() < 3 ? "" : args[2]));
+        return Utils::Resp::list(serverCtx->pubsubRepo().channels(args.size() < 3 ? "" : args[2]));
     }
     else if (subCommand == "NUMSUB") {
-        return Utils::Resp::hash(serverCtx->m_pubSubRepo->numsub({ args.begin() + 2, args.end() }));
+        return Utils::Resp::hash(serverCtx->pubsubRepo().numsub({ args.begin() + 2, args.end() }));
     }
     else if (subCommand == "NUMPAT") {
-        return Utils::Resp::integer(serverCtx->m_pubSubRepo->numpat());
+        return Utils::Resp::integer(serverCtx->pubsubRepo().numpat());
     }
 
     return Utils::Resp::error("unknown command");

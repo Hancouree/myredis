@@ -1,14 +1,13 @@
 #include "../include/ServerContext.h"
-#include "../include/Session.h"
 #include "../include/Utils.h"
 
-ServerContext::ServerContext(std::shared_ptr<Config> cfg)
+ServerContext::ServerContext(Config cfg)
     : m_activeConnections(0)
     , m_allConnections(0)
     , m_processedCommands(0)
     , m_config(std::move(cfg))
-    , m_repo(std::make_shared<Repository>(m_config))
-    , m_pubSubRepo(std::make_shared<PubSubRepository>())
+    , m_repo(m_config)
+    , m_pubSubRepo()
     , m_startTime(std::chrono::steady_clock::now())
 {
 }
@@ -26,6 +25,21 @@ void ServerContext::decrementConnections()
 void ServerContext::incrementProcessedCommands()
 {
     ++m_processedCommands;
+}
+
+Config& ServerContext::config()
+{
+    return m_config;
+}
+
+Repository& ServerContext::repo()
+{
+    return m_repo;
+}
+
+PubSubRepository& ServerContext::pubsubRepo()
+{
+    return m_pubSubRepo;
 }
 
 int ServerContext::getConnections() const

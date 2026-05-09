@@ -6,7 +6,7 @@ Cleaner::Cleaner(asio::io_context& ctx, std::shared_ptr<ServerContext> serverCtx
 	: m_timer(ctx)
 	, m_serverCtx(serverCtx)
 {
-	int hz = m_serverCtx->m_config->getInt("hz", 10);
+	int hz = m_serverCtx->config().getInt("hz", 10);
 	if (hz < 0) hz = 1;
 
 	m_timeout = 1000 / hz;
@@ -31,5 +31,5 @@ void Cleaner::doWait()
 
 void Cleaner::performCleanup()
 {
-	m_serverCtx->m_repo->performCleanup();
+	m_serverCtx->repo().performCleanup();
 }

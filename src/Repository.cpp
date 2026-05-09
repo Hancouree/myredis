@@ -3,10 +3,10 @@
 #include "../include/ServerContext.h"
 #include "../include/Config.h"
 
-Repository::Repository(std::shared_ptr<Config> config)
+Repository::Repository(const Config& config)
 {
 	m_memoryUsed = 0;
-	m_memoryLimit = config->getInt("maxmemory", 0);
+	m_memoryLimit = config.getInt("maxmemory", 0);
 }
 
 void Repository::performCleanup()
