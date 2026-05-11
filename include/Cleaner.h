@@ -1,5 +1,6 @@
 #pragma once
 #include <boost/asio.hpp>
+#include <memory>
 #include "ServerContext.h"
 
 namespace asio = boost::asio;

@@ -1,7 +1,12 @@
 #pragma once
+#include <vector>
+#include <string>
+#include <memory>
+#include <exception>
 #include <functional>
-#include "ServerContext.h"
 #include "../include/Utils.h"
+
+class ServerContext;
 
 class Handler {
 public:

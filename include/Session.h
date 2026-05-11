@@ -1,6 +1,7 @@
 #pragma once
 #include <boost/asio.hpp>
 #include <queue>
+#include <memory>
 #include <unordered_set>
 #include "ServerContext.h"
 #include "Parser.h"

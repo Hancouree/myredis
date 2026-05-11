@@ -1,6 +1,8 @@
 #pragma once
 #include <boost/asio.hpp>
 #include <boost/asio/buffers_iterator.hpp>
+#include <string>
+#include <vector>
 
 class Parser {
 public:
